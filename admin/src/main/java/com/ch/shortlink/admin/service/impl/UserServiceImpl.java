@@ -1,11 +1,11 @@
 package com.ch.shortlink.admin.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.ch.shortlink.admin.common.enums.UserErrorCodeEnum;
-import com.ch.shortlink.admin.common.convention.exception.ClientException;
-import org.springframework.beans.BeanUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ch.shortlink.admin.common.convention.exception.ClientException;
+import com.ch.shortlink.admin.common.enums.UserErrorCodeEnum;
 import com.ch.shortlink.admin.dao.entity.UserDO;
 import com.ch.shortlink.admin.dao.mapper.UserMapper;
 import com.ch.shortlink.admin.dto.resp.UserRespDTO;
@@ -32,8 +32,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if(userDO == null){
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
-        UserRespDTO result = new UserRespDTO();
-        BeanUtils.copyProperties(userDO, result);
-        return result;
+//        UserRespDTO result = new UserRespDTO();
+        return BeanUtil.toBean(userDO, UserRespDTO.class);
     }
+
 }
