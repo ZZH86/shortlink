@@ -1,7 +1,7 @@
 package com.ch.shortlink.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.ch.shortlink.admin.common.convention.enums.UserErrorCodeEnum;
+import com.ch.shortlink.admin.common.enums.UserErrorCodeEnum;
 import com.ch.shortlink.admin.common.convention.exception.ClientException;
 import org.springframework.beans.BeanUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;

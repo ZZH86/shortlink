@@ -1,4 +1,4 @@
-package com.ch.shortlink.admin.common.convention.enums;
+package com.ch.shortlink.admin.common.enums;
 
 import com.ch.shortlink.admin.common.convention.errorcode.IErrorCode;
 
