@@ -1,6 +1,7 @@
 package com.ch.shortlink.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -8,15 +9,21 @@ import com.ch.shortlink.admin.common.convention.exception.ClientException;
 import com.ch.shortlink.admin.common.enums.UserErrorCodeEnum;
 import com.ch.shortlink.admin.dao.entity.UserDO;
 import com.ch.shortlink.admin.dao.mapper.UserMapper;
+import com.ch.shortlink.admin.dto.req.UserLoginReqDTO;
 import com.ch.shortlink.admin.dto.req.UserRegisterReqDTO;
 import com.ch.shortlink.admin.dto.req.UserUpdateReqDTO;
+import com.ch.shortlink.admin.dto.resp.UserLoginRespDTO;
 import com.ch.shortlink.admin.dto.resp.UserRespDTO;
 import com.ch.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static com.ch.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
 
@@ -34,6 +41,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     // redisson 分布式锁
     private final RedissonClient redissonClient;
 
+    private final StringRedisTemplate stringRedisTemplate;
+
     /**
      * 根据用户名返回用户
      */
@@ -45,7 +54,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if(userDO == null){
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
-//        UserRespDTO result = new UserRespDTO();
         return BeanUtil.toBean(userDO, UserRespDTO.class);
     }
 
@@ -99,6 +107,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
                 .eq(UserDO::getUsername, requestParam.getUsername());
         baseMapper.update(BeanUtil.toBean(requestParam, UserDO.class), queryWrapper);
+    }
+
+    /**
+     * 用户登录
+     * @param requestParam 用户登录请求参数
+     * @return 用户登录返回响应 token
+     */
+    @Override
+    public UserLoginRespDTO login(UserLoginReqDTO requestParam) {
+        // 判断用户名和密码是否一样
+        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getUsername, requestParam.getUsername())
+                .eq(UserDO::getPassword, requestParam.getPassword())
+                .eq(UserDO::getDelFlag, 0);
+        UserDO userDO = baseMapper.selectOne(queryWrapper);
+
+        // 没有该用户抛出异常
+        if(userDO == null) {
+            throw new ClientException(UserErrorCodeEnum.USER_NULL);
+        }
+
+        // 生成 token
+        String uuid = UUID.randomUUID().toString();
+        // 用 token 作为 key 将用户信息存储到 redis, 并设置过期时间 30 分钟
+        stringRedisTemplate.opsForValue().set(uuid, JSON.toJSONString(userDO),30, TimeUnit.MINUTES);
+        return new UserLoginRespDTO(uuid);
+    }
+
+    /**
+     * 检查用户是否登录
+     * @param token 用户登录 Token
+     * @return 是否登录标识
+     */
+    @Override
+    public Boolean checkLogin(String token) {
+        return stringRedisTemplate.hasKey(token);
     }
 
 }
