@@ -13,7 +13,11 @@ import com.ch.shortlink.admin.dto.resp.UserRespDTO;
 import com.ch.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBloomFilter;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
+
+import static com.ch.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
 
 /**
  * @Author hui cao
@@ -25,6 +29,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     // 注入用户注册布隆过滤器
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
+
+    // redisson 分布式锁
+    private final RedissonClient redissonClient;
 
     /**
      * 根据用户名返回用户
@@ -56,14 +63,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
      */
     @Override
     public void register(UserRegisterReqDTO requestParam) {
+
+        // 名称已被使用则抛异常
         if(!hasUserName(requestParam.getUsername())){
             throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
         }
-        int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
-        userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
-        if(insert < 1){
-            throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
+
+        // 获得分布式锁
+        RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getUsername());
+
+        try{
+           if(lock.tryLock()) {
+               int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
+               userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+               if(insert < 1){
+                   throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
+               }
+               return;
+           }
+           throw new ClientException(UserErrorCodeEnum.USER_EXIST);
+        } finally {
+            lock.unlock();
         }
+
     }
 
 }
