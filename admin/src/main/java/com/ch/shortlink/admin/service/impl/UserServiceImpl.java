@@ -128,10 +128,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
 
+        Boolean hasLogin = stringRedisTemplate.hasKey("login_" + requestParam.getUsername());
+        if(hasLogin != null && hasLogin){
+            throw new ClientException(UserErrorCodeEnum.USER_LOGIN_EXIST);
+        }
         // 生成 token
+
+        /**
+         * Hash
+         * Key: login_用户名
+         * Value:
+         *   key: token 标识
+         *   Val: JSON 字符串(用户信息)
+         */
         String uuid = UUID.randomUUID().toString();
         // 用 token 作为 key 将用户信息存储到 redis, 并设置过期时间 30 分钟
-        stringRedisTemplate.opsForValue().set(uuid, JSON.toJSONString(userDO),30, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForHash().put("login_" + requestParam.getUsername(), uuid, JSON.toJSONString(userDO));
+        stringRedisTemplate.expire("login_" + requestParam.getUsername(), 30L, TimeUnit.MINUTES);
+
         return new UserLoginRespDTO(uuid);
     }
 
@@ -141,8 +155,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
      * @return 是否登录标识
      */
     @Override
-    public Boolean checkLogin(String token) {
-        return stringRedisTemplate.hasKey(token);
+    public Boolean checkLogin(String username, String token) {
+        return stringRedisTemplate.opsForHash().get("login_" + username, token) != null;
     }
 
 }
