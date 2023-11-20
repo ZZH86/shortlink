@@ -33,7 +33,7 @@ import static com.ch.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USE
  */
 @Service
 @RequiredArgsConstructor
-public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService{
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
 
     // 注入用户注册布隆过滤器
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
@@ -51,7 +51,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
                 .eq(UserDO::getUsername, username);
         UserDO userDO = baseMapper.selectOne(queryWrapper);
-        if(userDO == null){
+        if (userDO == null) {
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
         return BeanUtil.toBean(userDO, UserRespDTO.class);
@@ -59,6 +59,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     /**
      * 查看用户名是否可用
+     *
      * @return true 代表未被使用，可以用，false 代表已被使用
      */
     @Override
@@ -68,29 +69,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     /**
      * 用户注册
+     *
      * @param requestParam 用户注册请求参数
      */
     @Override
     public void register(UserRegisterReqDTO requestParam) {
 
         // 名称已被使用则抛异常
-        if(!hasUserName(requestParam.getUsername())){
+        if (!hasUserName(requestParam.getUsername())) {
             throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
         }
 
         // 获得分布式锁
         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getUsername());
 
-        try{
-           if(lock.tryLock()) {
-               int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
-               userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
-               if(insert < 1){
-                   throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
-               }
-               return;
-           }
-           throw new ClientException(UserErrorCodeEnum.USER_EXIST);
+        try {
+            if (lock.tryLock()) {
+                int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
+                userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+                if (insert < 1) {
+                    throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
+                }
+                return;
+            }
+            throw new ClientException(UserErrorCodeEnum.USER_EXIST);
         } finally {
             lock.unlock();
         }
@@ -99,6 +101,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     /**
      * 根据用户名修改用户信息
+     *
      * @param requestParam 修改用户请求参数
      */
     @Override
@@ -111,6 +114,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     /**
      * 用户登录
+     *
      * @param requestParam 用户登录请求参数
      * @return 用户登录返回响应 token
      */
@@ -124,12 +128,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         UserDO userDO = baseMapper.selectOne(queryWrapper);
 
         // 没有该用户抛出异常
-        if(userDO == null) {
+        if (userDO == null) {
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
 
         Boolean hasLogin = stringRedisTemplate.hasKey("login_" + requestParam.getUsername());
-        if(hasLogin != null && hasLogin){
+        if (hasLogin != null && hasLogin) {
             throw new ClientException(UserErrorCodeEnum.USER_LOGIN_EXIST);
         }
         // 生成 token
@@ -151,6 +155,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     /**
      * 检查用户是否登录
+     *
      * @param token 用户登录 Token
      * @return 是否登录标识
      */
@@ -161,10 +166,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public void logout(String username, String token) {
-        if(checkLogin(username, token)){
+        if (checkLogin(username, token)) {
             stringRedisTemplate.delete("login_" + username);
             return;
-        }else {
+        } else {
             throw new ClientException("用户token过期或者用户名不存在");
         }
     }
