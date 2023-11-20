@@ -9,6 +9,7 @@ import com.ch.shortlink.admin.common.enums.UserErrorCodeEnum;
 import com.ch.shortlink.admin.dao.entity.UserDO;
 import com.ch.shortlink.admin.dao.mapper.UserMapper;
 import com.ch.shortlink.admin.dto.req.UserRegisterReqDTO;
+import com.ch.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.ch.shortlink.admin.dto.resp.UserRespDTO;
 import com.ch.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -86,6 +87,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             lock.unlock();
         }
 
+    }
+
+    /**
+     * 根据用户名修改用户信息
+     * @param requestParam 修改用户请求参数
+     */
+    @Override
+    public void update(UserUpdateReqDTO requestParam) {
+        // TODO 验证当前用户名是否为登录用户
+        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getUsername, requestParam.getUsername());
+        baseMapper.update(BeanUtil.toBean(requestParam, UserDO.class), queryWrapper);
     }
 
 }
