@@ -4,5 +4,6 @@
     <inspection_tool class="JavadocDeclaration" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ADDITIONAL_TAGS" value="Author,Description:" />
     </inspection_tool>
+    <inspection_tool class="Lombok" enabled="false" level="WARNING" enabled_by_default="false" />
   </profile>
 </component>
