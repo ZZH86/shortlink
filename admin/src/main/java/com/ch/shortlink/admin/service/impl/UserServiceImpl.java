@@ -155,7 +155,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         String uuid = UUID.randomUUID().toString();
         // 用 token 作为 key 将用户信息存储到 redis, 并设置过期时间 30 分钟
         stringRedisTemplate.opsForHash().put("login_" + requestParam.getUsername(), uuid, JSON.toJSONString(userDO));
-        stringRedisTemplate.expire("login_" + requestParam.getUsername(), 30L, TimeUnit.MINUTES);
+        stringRedisTemplate.expire("login_" + requestParam.getUsername(), 30L, TimeUnit.DAYS);
 
         return new UserLoginRespDTO(uuid);
     }
