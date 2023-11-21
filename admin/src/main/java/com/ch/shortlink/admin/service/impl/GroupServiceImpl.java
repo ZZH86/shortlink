@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ch.shortlink.admin.common.biz.user.UserContext;
 import com.ch.shortlink.admin.common.convention.exception.ClientException;
 import com.ch.shortlink.admin.dao.entity.GroupDO;
 import com.ch.shortlink.admin.dao.mapper.GroupMapper;
@@ -33,19 +34,20 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         String gid;
         while (true) {
             gid = RandomIdGenerator.generateRandomId();
+            // 根据用户名和 gid 去查询数据库，如果有就重新生成gid
             LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                     .eq(GroupDO::getGid, gid)
-                    // TODO 设置用户名
-                    .eq(GroupDO::getUsername, null);
+                    .eq(GroupDO::getUsername, UserContext.getUsername());
             GroupDO hasGroupFlag = baseMapper.selectOne(queryWrapper);
             if (hasGroupFlag == null) {
                 break;
             }
         }
-
+        // 创建短链接分组
         GroupDO groupDO = GroupDO.builder()
-                .gid(RandomIdGenerator.generateRandomId())
+                .gid(gid)
                 .sortOrder(0)
+                .username(UserContext.getUsername())
                 .name(groupName)
                 .build();
         int insert = baseMapper.insert(groupDO);
@@ -59,10 +61,9 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
      */
     @Override
     public List<ShortLinkGroupRespDTO> listGroup() {
-        // TODO 获取用户名
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getDelFlag, 0)
-//                .isNull(GroupDO::getUsername)  // 后续得改
+                .eq(GroupDO::getUsername, UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
         return BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
