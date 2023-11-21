@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ch.shortlink.admin.common.biz.user.UserContext;
 import com.ch.shortlink.admin.common.convention.exception.ClientException;
 import com.ch.shortlink.admin.common.enums.UserErrorCodeEnum;
 import com.ch.shortlink.admin.dao.entity.UserDO;
@@ -22,6 +23,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -106,10 +108,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
      */
     @Override
     public void update(UserUpdateReqDTO requestParam) {
-        // TODO 验证当前用户名是否为登录用户
-        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
-                .eq(UserDO::getUsername, requestParam.getUsername());
-        baseMapper.update(BeanUtil.toBean(requestParam, UserDO.class), queryWrapper);
+        String username = requestParam.getUsername();
+        if(Objects.equals(username, UserContext.getUsername())){
+            LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
+                    .eq(UserDO::getUsername, requestParam.getUsername());
+            baseMapper.update(BeanUtil.toBean(requestParam, UserDO.class), queryWrapper);
+        }else {
+            throw new ClientException("非法更新操作");
+        }
+
     }
 
     /**
