@@ -2,12 +2,14 @@ package com.ch.shortlink.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ch.shortlink.admin.common.biz.user.UserContext;
 import com.ch.shortlink.admin.common.convention.exception.ClientException;
 import com.ch.shortlink.admin.dao.entity.GroupDO;
 import com.ch.shortlink.admin.dao.mapper.GroupMapper;
+import com.ch.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
 import com.ch.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.ch.shortlink.admin.service.GroupService;
 import com.ch.shortlink.admin.toolkit.RandomIdGenerator;
@@ -67,5 +69,24 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
         return BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
+    }
+
+    /**
+     * 修改短链接分组名称
+     *
+     * @param requestParam 修改名称请求参数
+     */
+    @Override
+    public void updateGroup(ShortLinkGroupUpdateReqDTO requestParam) {
+        LambdaUpdateWrapper<GroupDO> queryWrapper = Wrappers.lambdaUpdate(GroupDO.class)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getGid, requestParam.getGid())
+                .eq(GroupDO::getDelFlag, 0);
+        GroupDO groupDO = new GroupDO();
+        groupDO.setName(requestParam.getName());
+        int update = baseMapper.update(groupDO, queryWrapper);
+        if(update < 1){
+            throw new ClientException("分组信息更改失败");
+        }
     }
 }
