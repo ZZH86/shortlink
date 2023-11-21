@@ -85,8 +85,27 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         GroupDO groupDO = new GroupDO();
         groupDO.setName(requestParam.getName());
         int update = baseMapper.update(groupDO, queryWrapper);
-        if(update < 1){
+        if (update < 1) {
             throw new ClientException("分组信息更改失败");
+        }
+    }
+
+    /**
+     * 删除短链接分组
+     *
+     * @param gid 分组标识
+     */
+    @Override
+    public void deleteGroup(String gid) {
+        LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getGid, gid)
+                .eq(GroupDO::getDelFlag, 0);
+        GroupDO groupDO = new GroupDO();
+        groupDO.setDelFlag(1);
+        int update = baseMapper.update(groupDO, queryWrapper);
+        if (update < 1) {
+            throw new ClientException("分组信息删除失败");
         }
     }
 }
