@@ -15,6 +15,7 @@ public class UserTableShardingTest {
               `origin_url` VARCHAR(1024) DEFAULT NULL COMMENT '原始链接',
               `click_num` INT(11) DEFAULT '0' COMMENT '点击量',
               `gid` VARCHAR(32) DEFAULT 'default' COMMENT '分组标识',
+              `favicon` varchar(256) DEFAULT NULL COMMENT '网站图标',
               `enable_status` TINYINT(1) DEFAULT NULL COMMENT '启用标识 0：启用 1：未启用',
               `created_type` TINYINT(1) DEFAULT NULL COMMENT '创建类型 0：接口 1：控制台',
               `valid_date_type` TINYINT(1) DEFAULT NULL COMMENT '有效期类型 0：永久有效 1：用户自定义',
