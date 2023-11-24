@@ -53,8 +53,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .build();
         try {
             baseMapper.insert(shortLinkDO);
-        }catch (Exception e){
-            log.warn("短链接：{} 重复入库" , fullShortUrl);
+        } catch (Exception e) {
+            log.warn("短链接：{} 重复入库", fullShortUrl);
             throw new ServiceException("重复创建");
         }
         shortLinkBloomFilter.add(fullShortUrl);
@@ -71,7 +71,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         String shortUri;
         int customGenerateCount = 0;
         while (true) {
-            if(customGenerateCount > 10){
+            if (customGenerateCount > 10) {
                 throw new ServiceException("短链接生成频繁，请稍后再试");
             }
             originUrl += (System.currentTimeMillis());
