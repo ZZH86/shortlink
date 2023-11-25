@@ -32,7 +32,8 @@ import java.util.stream.Collectors;
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
 
     // TODO 后续重构为 springCloud Feign 调用
-    ShortLinkRemoteService shortLinkService = new ShortLinkRemoteService(){};
+    ShortLinkRemoteService shortLinkService = new ShortLinkRemoteService() {
+    };
 
     /**
      * 新增短链接分组
@@ -81,16 +82,20 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getDelFlag, 0)
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
+
         // 查询当前用户的所有分组标识
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
+
         // 传入用户的分组标识来查询分组列表下短链接数量
         List<ShortLinkGroupCountQueryRespDTO> countQueryRespDTOS =
                 shortLinkService.linkGroupShortLinkCount(groupDOList.stream().map(GroupDO::getGid).toList()).getData();
 
         // 类型转换
         List<ShortLinkGroupRespDTO> results = BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
+
         // 将 ShortLinkGroupCountQueryRespDTO 结果转换成 map 集合
         Map<String, Integer> counts = countQueryRespDTOS.stream().collect(Collectors.toMap(ShortLinkGroupCountQueryRespDTO::getGid, ShortLinkGroupCountQueryRespDTO::getShortLinkCount));
+
         // 将 map 的 count 结果设置进返回对象
         return results.stream().peek(result -> result.setShortLinkCount((counts.get(result.getGid()) == null) ? 0 : counts.get(result.getGid()))).toList();
     }
@@ -134,7 +139,6 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     }
 
     /**
-     *
      * @param requestParam 分组排序请求参数
      */
     @Override
