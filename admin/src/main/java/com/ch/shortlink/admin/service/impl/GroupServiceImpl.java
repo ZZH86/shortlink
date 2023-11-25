@@ -12,12 +12,16 @@ import com.ch.shortlink.admin.dao.mapper.GroupMapper;
 import com.ch.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
 import com.ch.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
 import com.ch.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
+import com.ch.shortlink.admin.remote.ShortLinkRemoteService;
+import com.ch.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.admin.service.GroupService;
 import com.ch.shortlink.admin.toolkit.RandomIdGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * @Author hui cao
@@ -27,6 +31,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
 
+    // TODO 后续重构为 springCloud Feign 调用
+    ShortLinkRemoteService shortLinkService = new ShortLinkRemoteService(){};
+
     /**
      * 新增短链接分组
      *
@@ -34,13 +41,18 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
      */
     @Override
     public void saveGroup(String groupName) {
+        saveGroup(UserContext.getUsername(), groupName);
+    }
+
+    @Override
+    public void saveGroup(String username, String groupName) {
         String gid;
         while (true) {
             gid = RandomIdGenerator.generateRandomId();
             // 根据用户名和 gid 去查询数据库，如果有就重新生成gid
             LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                     .eq(GroupDO::getGid, gid)
-                    .eq(GroupDO::getUsername, UserContext.getUsername());
+                    .eq(GroupDO::getUsername, username);
             GroupDO hasGroupFlag = baseMapper.selectOne(queryWrapper);
             if (hasGroupFlag == null) {
                 break;
@@ -50,7 +62,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         GroupDO groupDO = GroupDO.builder()
                 .gid(gid)
                 .sortOrder(0)
-                .username(UserContext.getUsername())
+                .username(username)
                 .name(groupName)
                 .build();
         int insert = baseMapper.insert(groupDO);
@@ -61,6 +73,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     /**
      * 查询用户短链接分组集合
+     * 获取用户所属的分组信息，并返回包含每个分组链接数量的分组信息列表
      */
     @Override
     public List<ShortLinkGroupRespDTO> listGroup() {
@@ -68,8 +81,18 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getDelFlag, 0)
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
+        // 查询当前用户的所有分组标识
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
-        return BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
+        // 传入用户的分组标识来查询分组列表下短链接数量
+        List<ShortLinkGroupCountQueryRespDTO> countQueryRespDTOS =
+                shortLinkService.linkGroupShortLinkCount(groupDOList.stream().map(GroupDO::getGid).toList()).getData();
+
+        // 类型转换
+        List<ShortLinkGroupRespDTO> results = BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
+        // 将 ShortLinkGroupCountQueryRespDTO 结果转换成 map 集合
+        Map<String, Integer> counts = countQueryRespDTOS.stream().collect(Collectors.toMap(ShortLinkGroupCountQueryRespDTO::getGid, ShortLinkGroupCountQueryRespDTO::getShortLinkCount));
+        // 将 map 的 count 结果设置进返回对象
+        return results.stream().peek(result -> result.setShortLinkCount((counts.get(result.getGid()) == null) ? 0 : counts.get(result.getGid()))).toList();
     }
 
     /**
