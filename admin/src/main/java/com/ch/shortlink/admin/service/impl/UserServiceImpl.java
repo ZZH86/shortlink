@@ -15,6 +15,7 @@ import com.ch.shortlink.admin.dto.req.UserRegisterReqDTO;
 import com.ch.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.ch.shortlink.admin.dto.resp.UserLoginRespDTO;
 import com.ch.shortlink.admin.dto.resp.UserRespDTO;
+import com.ch.shortlink.admin.service.GroupService;
 import com.ch.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBloomFilter;
@@ -45,6 +46,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     private final RedissonClient redissonClient;
 
     private final StringRedisTemplate stringRedisTemplate;
+
+    private final GroupService groupService;
 
     /**
      * 根据用户名返回用户
@@ -98,6 +101,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 }
 
                 userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+                groupService.saveGroup(requestParam.getUsername(),"默认分组");
                 return;
             }
             throw new ClientException(UserErrorCodeEnum.USER_EXIST);
@@ -151,7 +155,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         // 生成 token
 
-        /**
+        /*
          * Hash
          * Key: login_用户名
          * Value:
