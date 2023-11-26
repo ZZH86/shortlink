@@ -2,9 +2,11 @@ package com.ch.shortlink.admin.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ch.shortlink.admin.common.convention.result.Result;
+import com.ch.shortlink.admin.common.convention.result.Results;
 import com.ch.shortlink.admin.remote.ShortLinkRemoteService;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
+import com.ch.shortlink.admin.remote.dto.req.ShortLinkUpdateReqDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
@@ -30,6 +32,15 @@ public class ShortLinkController {
     @PostMapping("/api/short-link/admin/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortLink(@RequestBody ShortLinkCreateReqDTO requestParam){
         return shortLinkService.createShortLink(requestParam);
+    }
+
+    /**
+     * 修改短链接
+     */
+    @PostMapping("/api/short-link/admin/v1/update")
+    public Result<Void> updateShortLink(@RequestBody ShortLinkUpdateReqDTO requestParam) {
+        shortLinkService.updateShortLink(requestParam);
+        return Results.success();
     }
 
     /**
