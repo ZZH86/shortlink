@@ -12,6 +12,7 @@ import com.ch.shortlink.project.dao.entity.ShortLinkDO;
 import com.ch.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.ch.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkPageReqDTO;
+import com.ch.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkPageRespDTO;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -74,6 +76,37 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .fullShortUrl(shortLinkDO.getFullShortUrl())
                 .originUrl(shortLinkDO.getOriginUrl())
                 .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)    // TODO 目前其实不用加
+    @Override
+    public void updateShortLink(ShortLinkUpdateReqDTO requestParam) {
+        // TODO 这里目前不做修改 gid 的操作，后续优化
+
+        // 根据 gid 和 url 查询记录是否存在
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                .eq(ShortLinkDO::getDelFlag, 0)
+                .eq(ShortLinkDO::getEnableStatus, 0);
+        ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
+        if(shortLinkDO == null){
+            throw new ServiceException("短链接记录不存在");
+        }
+        ShortLinkDO updateShortLinkDO = ShortLinkDO.builder()
+                .domain(shortLinkDO.getDomain())
+                .shortUri(shortLinkDO.getShortUri())
+                .clickNum(shortLinkDO.getClickNum())
+                .favicon(shortLinkDO.getFavicon())
+                .createdType(shortLinkDO.getCreatedType())
+                .gid(requestParam.getGid())
+                .originUrl(requestParam.getOriginUrl())
+                .describe(requestParam.getDescribe())
+                .validDate(requestParam.getValidDate())
+                .validDateType(requestParam.getValidDateType())
+                .build();
+
+        baseMapper.update(updateShortLinkDO, queryWrapper);
     }
 
     /**
