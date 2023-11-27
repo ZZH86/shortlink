@@ -37,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -271,11 +272,25 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
             // 原始链接存在，进行 302 重定向跳转
             if (shortLinkDO != null) {
+                // 判断是否过期,过期的话就当空值进行回写 redis，防止穿透
+                if (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date())) {
+                    int timeout = RandomUtil.randomInt(500) + 1800;
+                    stringRedisTemplate.opsForValue().set(
+                            String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),
+                            "hi~", timeout, TimeUnit.SECONDS);
+                    return;
+                }
+
                 String originShortLink = shortLinkDO.getOriginUrl();
                 try {
                     // 将查询到的原始链接回写进数据库 （缓存穿透）
                     stringRedisTemplate.opsForValue().set(
-                            String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()), originShortLink);
+                            String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()),
+                            shortLinkDO.getOriginUrl(),
+                            LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()),
+                            TimeUnit.MILLISECONDS
+                    );
+
                     ((HttpServletResponse) response).sendRedirect(originShortLink);
                 } catch (IOException e) {
                     throw new ServiceException("跳转失败OvO");
