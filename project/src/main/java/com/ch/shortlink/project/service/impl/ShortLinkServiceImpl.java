@@ -23,6 +23,7 @@ import com.ch.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.ch.shortlink.project.service.ShortLinkService;
 import com.ch.shortlink.project.toolkit.HashUtil;
+import com.ch.shortlink.project.toolkit.LinkUtil;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletResponse;
@@ -101,6 +102,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             log.warn("短链接：{} 重复入库", fullShortUrl);
             throw new ServiceException("重复创建");
         }
+
+        // 缓存预热
+        stringRedisTemplate.opsForValue().set(
+                String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()),
+                requestParam.getOriginUrl(),
+                LinkUtil.getLinkCacheValidTime(requestParam.getValidDate()),
+                TimeUnit.MILLISECONDS
+        );
+
+        // 添加到布隆过滤器
         shortLinkBloomFilter.add(fullShortUrl);
         return ShortLinkCreateRespDTO.builder()
                 .gid(shortLinkDO.getGid())
@@ -243,7 +254,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             if (shortLinkGotoDO == null) {
                 // 如果数据库也没有，就将该短链接缓存为空值,30 分钟过期时间+一个随机数（缓存击穿）
                 int timeout = RandomUtil.randomInt(500) + 1800;
-                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "hi~", timeout, TimeUnit.SECONDS);
+                stringRedisTemplate.opsForValue().set(
+                        String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),
+                        "hi~", timeout, TimeUnit.SECONDS);
                 return;
             }
             String gid = shortLinkGotoDO.getGid();
