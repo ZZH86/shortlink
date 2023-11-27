@@ -3,6 +3,7 @@ package com.ch.shortlink.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ch.shortlink.project.common.convention.result.Result;
 import com.ch.shortlink.project.common.convention.result.Results;
+import com.ch.shortlink.project.dto.req.ShortLinkRecoverRecycleBinReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkSaveRecycleBinReqDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkPageRespDTO;
@@ -25,8 +26,6 @@ public class RecycleBinController {
 
     /**
      * 移至回收站
-     *
-     * @param requestParam 移至回收站请求参数
      */
     @PostMapping("/api/short-link/v1/recycle-bin/save")
     public Result<Void> saveRecycleBin(@RequestBody ShortLinkSaveRecycleBinReqDTO requestParam) {
@@ -34,9 +33,20 @@ public class RecycleBinController {
         return Results.success();
     }
 
+    /**
+     * 分页查询回收站短链接
+     */
     @GetMapping("/api/short-link/v1/recycle-bin/page")
     public Result<IPage<ShortLinkPageRespDTO>> pageShortLink(ShortLinkRecycleBinPageReqDTO requestParam){
         return Results.success(recycleBinService.pageShortLink(requestParam));
     }
 
+    /**
+     * 恢复回收站短链接
+     */
+    @PostMapping("/api/short-link/v1/recycle-bin/recover")
+    public Result<Void> recoverRecycleBinShortLink(@RequestBody ShortLinkRecoverRecycleBinReqDTO requestParam){
+        recycleBinService.recoverRecycleBinShortLink(requestParam);
+        return Results.success();
+    }
 }
