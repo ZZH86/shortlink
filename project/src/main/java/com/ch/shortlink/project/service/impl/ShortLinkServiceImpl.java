@@ -2,11 +2,13 @@ package com.ch.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.text.StrBuilder;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ch.shortlink.project.common.constant.RedisKeyConstant;
 import com.ch.shortlink.project.common.convention.exception.ServiceException;
 import com.ch.shortlink.project.dao.entity.ShortLinkDO;
 import com.ch.shortlink.project.dao.entity.ShortLinkGotoDO;
@@ -26,6 +28,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +51,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RBloomFilter<String> shortLinkBloomFilter;
 
     private final ShortLinkGotoMapper shortLinkGotoMapper;
+
+    private final StringRedisTemplate stringRedisTemplate;
+
+    private final RedissonClient redissonClient;
 
     /**
      * 创建短链接
@@ -100,6 +109,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     /**
      * 修改短链接
+     *
      * @param requestParam 修改短链接请求参数
      */
     @Transactional(rollbackFor = Exception.class)    // TODO 目前其实不用加
@@ -184,34 +194,68 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         String serverName = request.getServerName();
         String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
 
-        // 通过 goto 表查到 gid
-        LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
-                .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
-        ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
-        if(shortLinkGotoDO == null){
-            // TODO 此处要进行风控
-            return;
-        }
-        String gid = shortLinkGotoDO.getGid();
+        // 通过 redis 来存储短连接的原始链接，防止缓存击穿
+        String originalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
 
-        // 通过 gid 查询 t_link 表找到对应的原始链接
-        LambdaQueryWrapper<ShortLinkDO> linkDOLambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid, gid)
-                .eq(ShortLinkDO::getFullShortUrl, fullShortUrl)
-                .eq(ShortLinkDO::getEnableStatus, 0)
-                .eq(ShortLinkDO::getDelFlag, 0);
-        ShortLinkDO shortLinkDO = baseMapper.selectOne(linkDOLambdaQueryWrapper);
-
-        // 原始链接存在，进行 302 重定向跳转
-        if(shortLinkDO != null){
-            String originShortLink = shortLinkDO.getOriginUrl();
+        // 如果存在，直接进行跳转
+        if (StrUtil.isNotBlank(originalLink)) {
             try {
-                ((HttpServletResponse) response).sendRedirect(originShortLink);
+                ((HttpServletResponse) response).sendRedirect(originalLink);
+                return;
             } catch (IOException e) {
                 throw new ServiceException("跳转失败OvO");
             }
         }
 
+        // 如果不存在，则需要查询数据库并进行回写,引入分布式锁防止大量不存在数据查询数据库
+        RLock lock = redissonClient.getLock(String.format(RedisKeyConstant.LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
+        lock.lock();
+
+        try {
+            // 双重判定锁，如果有很多个请求已经到达 lock ，就没必要全部查询数据库，一个请求回写后走 redis
+            originalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
+            if (StrUtil.isNotBlank(originalLink)) {
+                try {
+                    ((HttpServletResponse) response).sendRedirect(originalLink);
+                    return;
+                } catch (IOException e) {
+                    throw new ServiceException("跳转失败OvO");
+                }
+            }
+
+            // 通过 goto 表查到 gid
+            LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
+                    .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
+            ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
+            if (shortLinkGotoDO == null) {
+                // TODO 此处要进行风控
+                return;
+            }
+            String gid = shortLinkGotoDO.getGid();
+
+            // 通过 gid 查询 t_link 表找到对应的原始链接
+            LambdaQueryWrapper<ShortLinkDO> linkDOLambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                    .eq(ShortLinkDO::getGid, gid)
+                    .eq(ShortLinkDO::getFullShortUrl, fullShortUrl)
+                    .eq(ShortLinkDO::getEnableStatus, 0)
+                    .eq(ShortLinkDO::getDelFlag, 0);
+            ShortLinkDO shortLinkDO = baseMapper.selectOne(linkDOLambdaQueryWrapper);
+
+            // 原始链接存在，进行 302 重定向跳转
+            if (shortLinkDO != null) {
+                String originShortLink = shortLinkDO.getOriginUrl();
+                try {
+                    // 将查询到的原始链接回写进数据库
+                    stringRedisTemplate.opsForValue().set(
+                            String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()), originShortLink);
+                    ((HttpServletResponse) response).sendRedirect(originShortLink);
+                } catch (IOException e) {
+                    throw new ServiceException("跳转失败OvO");
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
 
