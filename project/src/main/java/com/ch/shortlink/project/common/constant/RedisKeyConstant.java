@@ -1,0 +1,19 @@
+package com.ch.shortlink.project.common.constant;
+
+/**
+ * @Author hui cao
+ * @Description: redis key 常量类
+ */
+public class RedisKeyConstant {
+
+    /**
+     * 短链接跳转 key
+     */
+    public static final String GOTO_SHORT_LINK_KEY = "short-link_goto_%s";
+
+    /**
+     * 短链接跳转锁 key
+     */
+    public static final String LOCK_GOTO_SHORT_LINK_KEY = "lock_short-link_goto_%s";
+
+}
