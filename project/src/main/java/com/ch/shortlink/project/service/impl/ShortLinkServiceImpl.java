@@ -89,6 +89,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .validDateType(requestParam.getValidDateType())
                 .validDate(requestParam.getValidDate())
                 .describe(requestParam.getDescribe())
+                .favicon(LinkUtil.getWebsiteIcon(requestParam.getOriginUrl()))
                 .build();
 
         // 新建同时插入到 shortLinkGoto 表
