@@ -204,7 +204,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
      * @param response http 响应
      */
     @Override
-    public void restoreUri(String shortUri, ServletRequest request, ServletResponse response) {
+    public void restoreUri(String shortUri, ServletRequest request, ServletResponse response){
         String serverName = request.getServerName();
         String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
 
@@ -213,21 +213,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // 如果存在，直接进行跳转
         if (StrUtil.isNotBlank(originalLink)) {
-            try {
-                ((HttpServletResponse) response).sendRedirect(originalLink);
-                return;
-            } catch (IOException e) {
-                throw new ServiceException("跳转失败OvO");
-            }
+            sendRedirect(response, originalLink);
+            return;
         }
 
         // 如果布隆过滤器不存在，那么数据库也一定不存在（缓存击穿）
         if (!shortLinkBloomFilter.contains(fullShortUrl)) {
+            sendRedirect(response, "/page/notfound");
             return;
         }
 
         // 判断是否已经将该链接缓存为空值（缓存击穿）
         if (StrUtil.isNotBlank(stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl)))) {
+            sendRedirect(response, "/page/notfound");
             return;
         }
 
@@ -239,12 +237,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 双重判定锁，如果有很多个请求已经到达 lock ，就没必要全部查询数据库，一个请求回写后走 redis
             originalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
             if (StrUtil.isNotBlank(originalLink)) {
-                try {
-                    ((HttpServletResponse) response).sendRedirect(originalLink);
-                    return;
-                } catch (IOException e) {
-                    throw new ServiceException("跳转失败OvO");
-                }
+                sendRedirect(response, originalLink);
+                return;
             }
 
             // 通过 goto 表查到 gid
@@ -258,6 +252,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 stringRedisTemplate.opsForValue().set(
                         String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),
                         "hi~", timeout, TimeUnit.SECONDS);
+                sendRedirect(response, "/page/notfound");
                 return;
             }
             String gid = shortLinkGotoDO.getGid();
@@ -278,23 +273,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     stringRedisTemplate.opsForValue().set(
                             String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),
                             "hi~", timeout, TimeUnit.SECONDS);
+                    sendRedirect(response, "/page/notfound");
                     return;
                 }
 
                 String originShortLink = shortLinkDO.getOriginUrl();
-                try {
-                    // 将查询到的原始链接回写进数据库 （缓存穿透）
-                    stringRedisTemplate.opsForValue().set(
-                            String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()),
-                            shortLinkDO.getOriginUrl(),
-                            LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()),
-                            TimeUnit.MILLISECONDS
-                    );
-
-                    ((HttpServletResponse) response).sendRedirect(originShortLink);
-                } catch (IOException e) {
-                    throw new ServiceException("跳转失败OvO");
-                }
+                // 将查询到的原始链接回写进数据库 （缓存穿透）
+                stringRedisTemplate.opsForValue().set(
+                        String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()),
+                        shortLinkDO.getOriginUrl(),
+                        LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()),
+                        TimeUnit.MILLISECONDS
+                );
+                sendRedirect(response, originShortLink);
             }
         } finally {
             lock.unlock();
@@ -302,6 +293,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     }
 
 
+    /**
+     * 获得六位数短链接
+     * @param requestParam 请求参数
+     * @return 六位短链接
+     */
     private String getShortLinkCode(ShortLinkCreateReqDTO requestParam) {
         String originUrl = requestParam.getOriginUrl();
         String shortUri;
@@ -318,6 +314,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             customGenerateCount++;
         }
         return shortUri;
+    }
+
+    /**
+     * 短链接重定向
+     * @param response 响应对象
+     * @param url 跳转链接
+     */
+    private void sendRedirect(ServletResponse response, String url){
+        try {
+            ((HttpServletResponse) response).sendRedirect(url);
+        } catch (IOException e) {
+            throw new ServiceException("跳转失败OvO");
+        }
     }
 
 
