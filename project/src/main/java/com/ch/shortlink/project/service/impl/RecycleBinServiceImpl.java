@@ -10,6 +10,7 @@ import com.ch.shortlink.project.common.constant.RedisKeyConstant;
 import com.ch.shortlink.project.common.convention.exception.ServiceException;
 import com.ch.shortlink.project.dao.entity.ShortLinkDO;
 import com.ch.shortlink.project.dao.mapper.ShortLinkMapper;
+import com.ch.shortlink.project.dto.req.RecycleBinRemoveReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkRecoverRecycleBinReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkSaveRecycleBinReqDTO;
@@ -39,14 +40,8 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
      */
     @Override
     public void saveRecycleBin(ShortLinkSaveRecycleBinReqDTO requestParam) {
-        LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid, requestParam.getGid())
-                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
-                .eq(ShortLinkDO::getEnableStatus, 0)
-                .eq(ShortLinkDO::getDelFlag, 0);
-        ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                .enableStatus(1)
-                .build();
+        LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class).eq(ShortLinkDO::getGid, requestParam.getGid()).eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl()).eq(ShortLinkDO::getEnableStatus, 0).eq(ShortLinkDO::getDelFlag, 0);
+        ShortLinkDO shortLinkDO = ShortLinkDO.builder().enableStatus(1).build();
 
         int update = baseMapper.update(shortLinkDO, updateWrapper);
         if (update < 1) {
@@ -64,11 +59,7 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
      */
     @Override
     public IPage<ShortLinkPageRespDTO> pageShortLink(ShortLinkRecycleBinPageReqDTO requestParam) {
-        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .in(ShortLinkDO::getGid, requestParam.getGidList())
-                .eq(ShortLinkDO::getDelFlag, 0)
-                .eq(ShortLinkDO::getEnableStatus, 1)
-                .orderByDesc(ShortLinkDO::getUpdateTime);
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class).in(ShortLinkDO::getGid, requestParam.getGidList()).eq(ShortLinkDO::getDelFlag, 0).eq(ShortLinkDO::getEnableStatus, 1).orderByDesc(ShortLinkDO::getUpdateTime);
         IPage<ShortLinkDO> results = baseMapper.selectPage(requestParam, queryWrapper);
         return results.convert(each -> {
             ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
@@ -85,14 +76,8 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
      */
     @Override
     public void recoverRecycleBinShortLink(ShortLinkRecoverRecycleBinReqDTO requestParam) {
-        LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid, requestParam.getGid())
-                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
-                .eq(ShortLinkDO::getEnableStatus, 1)
-                .eq(ShortLinkDO::getDelFlag, 0);
-        ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                .enableStatus(0)
-                .build();
+        LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class).eq(ShortLinkDO::getGid, requestParam.getGid()).eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl()).eq(ShortLinkDO::getEnableStatus, 1).eq(ShortLinkDO::getDelFlag, 0);
+        ShortLinkDO shortLinkDO = ShortLinkDO.builder().enableStatus(0).build();
 
         int update = baseMapper.update(shortLinkDO, updateWrapper);
         if (update < 1) {
@@ -100,20 +85,27 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
         }
 
         // 拿到更新后的短链接做缓存预热
-        LambdaQueryWrapper<ShortLinkDO> linkDOLambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid, requestParam.getGid())
-                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
-                .eq(ShortLinkDO::getEnableStatus, 0)
-                .eq(ShortLinkDO::getDelFlag, 0);
+        LambdaQueryWrapper<ShortLinkDO> linkDOLambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class).eq(ShortLinkDO::getGid, requestParam.getGid()).eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl()).eq(ShortLinkDO::getEnableStatus, 0).eq(ShortLinkDO::getDelFlag, 0);
         ShortLinkDO newShortLinkDO = baseMapper.selectOne(linkDOLambdaQueryWrapper);
         // 将恢复的短链接重新加入到缓存中(缓存预热)
-        stringRedisTemplate.opsForValue().set(
-                String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()),
-                newShortLinkDO.getOriginUrl(),
-                LinkUtil.getLinkCacheValidTime(newShortLinkDO.getValidDate()),
-                TimeUnit.MILLISECONDS
-        );
+        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()), newShortLinkDO.getOriginUrl(), LinkUtil.getLinkCacheValidTime(newShortLinkDO.getValidDate()), TimeUnit.MILLISECONDS);
         //把原来可能还存在的缓存的空值删除
         stringRedisTemplate.delete(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
+    }
+
+    /**
+     * 删除回收站短链接
+     *
+     * @param requestParam 删除回收站短链接请求参数
+     */
+    @Override
+    public void removeRecycleBinShortLink(RecycleBinRemoveReqDTO requestParam) {
+        LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class).eq(ShortLinkDO::getGid, requestParam.getGid()).eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl()).eq(ShortLinkDO::getEnableStatus, 1).eq(ShortLinkDO::getDelFlag, 0);
+        ShortLinkDO shortLinkDO = new ShortLinkDO();
+        shortLinkDO.setDelFlag(1);
+        int delete = baseMapper.update(shortLinkDO, updateWrapper);
+        if (delete < 1) {
+            throw new ServiceException("删除回收站短链接失败");
+        }
     }
 }
