@@ -24,12 +24,14 @@ public interface ShortLinkRemoteService {
 
     /**
      * 创建短链接
+     *
      * @param requestParam 创建短链接请求对象
      * @return 创建短链接响应对象
      */
-    default Result<ShortLinkCreateRespDTO> createShortLink(ShortLinkCreateReqDTO requestParam){
+    default Result<ShortLinkCreateRespDTO> createShortLink(ShortLinkCreateReqDTO requestParam) {
         String result = HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/create", JSON.toJSONString(requestParam));
-        return JSON.parseObject(result, new TypeReference<>() {});
+        return JSON.parseObject(result, new TypeReference<>() {
+        });
     }
 
     /**
@@ -41,31 +43,51 @@ public interface ShortLinkRemoteService {
 
     /**
      * 分页查询短链接
+     *
      * @param requestParam 分页查询短链接请求参数
      * @return 短链接分页响应对象
      */
-    default Result<IPage<ShortLinkPageRespDTO>> pageShortLink(ShortLinkPageReqDTO requestParam){
+    default Result<IPage<ShortLinkPageRespDTO>> pageShortLink(ShortLinkPageReqDTO requestParam) {
         HashMap<String, Object> requestMap = new HashMap<>();
         requestMap.put("gid", requestParam.getGid());
         requestMap.put("current", requestParam.getCurrent());
         requestMap.put("size", requestParam.getSize());
         String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/page", requestMap);
-        return JSON.parseObject(resultPageStr, new TypeReference<>() {});
+        return JSON.parseObject(resultPageStr, new TypeReference<>() {
+        });
     }
 
     /**
      * 查询短链接分组内短链接数量
+     *
      * @param requestParam 分组标识列表
      * @return 分组数量响应对象列表
      */
-    default Result<List<ShortLinkGroupCountQueryRespDTO>> linkGroupShortLinkCount(List<String> requestParam){
+    default Result<List<ShortLinkGroupCountQueryRespDTO>> linkGroupShortLinkCount(List<String> requestParam) {
         HashMap<String, Object> requestMap = new HashMap<>();
         requestMap.put("requestParam", requestParam);
         String result = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/count", requestMap);
-        return JSON.parseObject(result, new TypeReference<>() {});
+        return JSON.parseObject(result, new TypeReference<>() {
+        });
     }
 
-    default void saveRecycleBin(ShortLinkSaveRecycleBinReqDTO requestParam){
+    default void saveRecycleBin(ShortLinkSaveRecycleBinReqDTO requestParam) {
         HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recycle-bin/save", JSON.toJSONString(requestParam));
+    }
+
+    /**
+     * 分页查询回收站短链接
+     *
+     * @param requestParam 分页短链接请求参数
+     * @return 查询短链接相应
+     */
+    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleShortLink(ShortLinkPageReqDTO requestParam) {
+        HashMap<String, Object> requestMap = new HashMap<>();
+        requestMap.put("gid", requestParam.getGid());
+        requestMap.put("current", requestParam.getCurrent());
+        requestMap.put("size", requestParam.getSize());
+        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/recycle-bin/page", requestMap);
+        return JSON.parseObject(resultPageStr, new TypeReference<>() {
+        });
     }
 }
