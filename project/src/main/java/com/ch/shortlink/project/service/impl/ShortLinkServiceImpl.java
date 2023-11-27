@@ -205,7 +205,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
      * @param response http 响应
      */
     @Override
-    public void restoreUri(String shortUri, ServletRequest request, ServletResponse response){
+    public void restoreUri(String shortUri, ServletRequest request, ServletResponse response) {
         String serverName = request.getServerName();
         String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
 
@@ -266,28 +266,31 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .eq(ShortLinkDO::getDelFlag, 0);
             ShortLinkDO shortLinkDO = baseMapper.selectOne(linkDOLambdaQueryWrapper);
 
-            // 原始链接存在，进行 302 重定向跳转
-            if (shortLinkDO != null) {
-                // 判断是否过期,过期的话就当空值进行回写 redis，防止穿透
-                if (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date())) {
-                    int timeout = RandomUtil.randomInt(500) + 1800;
-                    stringRedisTemplate.opsForValue().set(
-                            String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),
-                            "hi~", timeout, TimeUnit.SECONDS);
-                    sendRedirect(response, "/page/notfound");
-                    return;
-                }
 
-                String originShortLink = shortLinkDO.getOriginUrl();
-                // 将查询到的原始链接回写进数据库 （缓存穿透）
+            if (shortLinkDO == null || (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date()))) {
+                // 判断是否过期,过期的话就当空值进行回写 redis，防止穿透
+                // 或者移入了回收站也缓存空对象
+                int timeout = RandomUtil.randomInt(500) + 1800;
                 stringRedisTemplate.opsForValue().set(
-                        String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()),
-                        shortLinkDO.getOriginUrl(),
-                        LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()),
-                        TimeUnit.MILLISECONDS
-                );
-                sendRedirect(response, originShortLink);
+                        String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),
+                        "hi~", timeout, TimeUnit.SECONDS);
+                sendRedirect(response, "/page/notfound");
+                return;
             }
+
+            // 原始链接存在，写入缓存并进行 302 重定向跳转
+            String originShortLink = shortLinkDO.getOriginUrl();
+
+            // 将查询到的原始链接回写进数据库 （缓存穿透）
+            stringRedisTemplate.opsForValue().set(
+                    String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()),
+                    shortLinkDO.getOriginUrl(),
+                    LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()),
+                    TimeUnit.MILLISECONDS
+            );
+
+            //跳转
+            sendRedirect(response, originShortLink);
         } finally {
             lock.unlock();
         }
@@ -296,6 +299,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     /**
      * 获得六位数短链接
+     *
      * @param requestParam 请求参数
      * @return 六位短链接
      */
@@ -319,10 +323,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     /**
      * 短链接重定向
+     *
      * @param response 响应对象
-     * @param url 跳转链接
+     * @param url      跳转链接
      */
-    private void sendRedirect(ServletResponse response, String url){
+    private void sendRedirect(ServletResponse response, String url) {
         try {
             ((HttpServletResponse) response).sendRedirect(url);
         } catch (IOException e) {
