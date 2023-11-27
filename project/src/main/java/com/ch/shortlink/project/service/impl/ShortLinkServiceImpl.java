@@ -2,6 +2,7 @@ package com.ch.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.text.StrBuilder;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -37,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @Author hui cao
@@ -194,7 +196,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         String serverName = request.getServerName();
         String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
 
-        // 通过 redis 来存储短连接的原始链接，防止缓存击穿
+        // 通过 redis 来存储短连接的原始链接，防止缓存击穿（缓存穿透）
         String originalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
 
         // 如果存在，直接进行跳转
@@ -205,6 +207,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             } catch (IOException e) {
                 throw new ServiceException("跳转失败OvO");
             }
+        }
+
+        // 如果布隆过滤器不存在，那么数据库也一定不存在（缓存击穿）
+        if (!shortLinkBloomFilter.contains(fullShortUrl)) {
+            return;
+        }
+
+        // 判断是否已经将该链接缓存为空值（缓存击穿）
+        if (StrUtil.isNotBlank(stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl)))) {
+            return;
         }
 
         // 如果不存在，则需要查询数据库并进行回写,引入分布式锁防止大量不存在数据查询数据库
@@ -227,8 +239,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
                     .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
             ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
+
             if (shortLinkGotoDO == null) {
-                // TODO 此处要进行风控
+                // 如果数据库也没有，就将该短链接缓存为空值,30 分钟过期时间+一个随机数（缓存击穿）
+                int timeout = RandomUtil.randomInt(500) + 1800;
+                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "hi~", timeout, TimeUnit.SECONDS);
                 return;
             }
             String gid = shortLinkGotoDO.getGid();
@@ -245,7 +260,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             if (shortLinkDO != null) {
                 String originShortLink = shortLinkDO.getOriginUrl();
                 try {
-                    // 将查询到的原始链接回写进数据库
+                    // 将查询到的原始链接回写进数据库 （缓存穿透）
                     stringRedisTemplate.opsForValue().set(
                             String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()), originShortLink);
                     ((HttpServletResponse) response).sendRedirect(originShortLink);
