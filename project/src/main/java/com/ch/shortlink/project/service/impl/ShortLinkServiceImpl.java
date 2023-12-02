@@ -3,7 +3,9 @@ package com.ch.shortlink.project.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.Week;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.core.text.StrBuilder;
+import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -30,6 +32,8 @@ import com.ch.shortlink.project.toolkit.HashUtil;
 import com.ch.shortlink.project.toolkit.LinkUtil;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,10 +45,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @Author hui cao
@@ -350,9 +353,46 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         }
     }
 
-    private void shortLinkStats(String fullShortUrl, String gid, ServletRequest request, ServletResponse response){
+    private void shortLinkStats(String fullShortUrl, String gid, ServletRequest request, ServletResponse response) {
+
+        // 获取请求中的 cookie
+        Cookie[] cookies = ((HttpServletRequest) request).getCookies();
+
+        // stream 流用原子类
+        AtomicBoolean uvFirstFlag = new AtomicBoolean();
+
         try {
-            if(gid == null){
+            // 定义设置添加 uvCookie 的函数
+            Runnable addResponseCookieTask = () -> {
+                String uv = UUID.fastUUID().toString();
+                Cookie uvCookie = new Cookie("uv", uv);
+                uvCookie.setMaxAge(60 * 60 * 24 * 30);
+                uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
+                ((HttpServletResponse) response).addCookie(uvCookie);
+                uvFirstFlag.set(Boolean.TRUE);
+                stringRedisTemplate.opsForSet().add(
+                        String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), uv);
+            };
+            // 不为空：获取 uv 的值，添加到 redis set缓存,添加失败代表已经添加过，flag 被设置为 false，设置标识
+            if (ArrayUtil.isNotEmpty(cookies)) {
+                Arrays.stream(cookies)
+                        .filter(cookie -> Objects.equals(cookie.getName(), "uv"))
+                        .findFirst()
+                        .map(Cookie::getValue)
+                        .ifPresentOrElse(each -> {
+                                    Long add = stringRedisTemplate.opsForSet().add(
+                                            String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), each);
+                                    uvFirstFlag.set(add != null && add > 0L);
+                                }, addResponseCookieTask
+                        );
+            }
+            // 为空：直接设置 uv，并缓存
+            else {
+                addResponseCookieTask.run();
+            }
+
+            // gid 为空是否去 goto 表获取
+            if (gid == null) {
                 LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
                         .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
                 ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
@@ -363,7 +403,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             int weekIso8601Value = week.getIso8601Value();
             LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
                     .pv(1)
-                    .uv(1)
+                    .uv(uvFirstFlag.get() ? 1 : 0)
                     .uip(1)
                     .hour(hour)
                     .weekday(weekIso8601Value)
@@ -372,14 +412,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .date(new Date())
                     .build();
             linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
-        }catch (Exception ex){
+        } catch (Exception ex) {
             log.error("短连接流量访问异常", ex);
         }
 
 
     }
-
-
 
 
 }
