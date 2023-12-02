@@ -26,4 +26,9 @@ public class RedisKeyConstant {
      */
     public static final String UV_STATS_SHORT_LINK_KEY = "short-link_stats_uv_%s";
 
+    /**
+     * 短链接uip统计
+     */
+    public static final String UIP_STATS_SHORT_LINK_KEY = "short-link_stats_uip_%s";
+
 }

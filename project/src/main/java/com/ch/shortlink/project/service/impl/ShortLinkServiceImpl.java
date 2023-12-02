@@ -360,19 +360,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // stream 流用原子类
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
-
+// 定义设置添加 uvCookie 的函数
+        Runnable addResponseCookieTask = () -> {
+            String uv = UUID.fastUUID().toString();
+            Cookie uvCookie = new Cookie("uv", uv);
+            uvCookie.setMaxAge(60 * 60 * 24 * 30);
+            uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
+            ((HttpServletResponse) response).addCookie(uvCookie);
+            uvFirstFlag.set(Boolean.TRUE);
+            stringRedisTemplate.opsForSet().add(
+                    String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), uv);
+        };
         try {
-            // 定义设置添加 uvCookie 的函数
-            Runnable addResponseCookieTask = () -> {
-                String uv = UUID.fastUUID().toString();
-                Cookie uvCookie = new Cookie("uv", uv);
-                uvCookie.setMaxAge(60 * 60 * 24 * 30);
-                uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
-                ((HttpServletResponse) response).addCookie(uvCookie);
-                uvFirstFlag.set(Boolean.TRUE);
-                stringRedisTemplate.opsForSet().add(
-                        String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), uv);
-            };
+
             // 不为空：获取 uv 的值，添加到 redis set缓存,添加失败代表已经添加过，flag 被设置为 false，设置标识
             if (ArrayUtil.isNotEmpty(cookies)) {
                 Arrays.stream(cookies)
@@ -380,9 +380,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .findFirst()
                         .map(Cookie::getValue)
                         .ifPresentOrElse(each -> {
-                                    Long add = stringRedisTemplate.opsForSet().add(
+                                    Long uvAdd = stringRedisTemplate.opsForSet().add(
                                             String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), each);
-                                    uvFirstFlag.set(add != null && add > 0L);
+                                    uvFirstFlag.set(uvAdd != null && uvAdd > 0L);
                                 }, addResponseCookieTask
                         );
             }
@@ -390,6 +390,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             else {
                 addResponseCookieTask.run();
             }
+
+            // uip 统计操作
+            String actualIp = LinkUtil.getActualIp((HttpServletRequest) request);
+            Long uipAdd = stringRedisTemplate.opsForSet().add(
+                    String.format(RedisKeyConstant.UIP_STATS_SHORT_LINK_KEY, fullShortUrl), actualIp);
+            boolean uipFirstFlag = (uipAdd != null && uipAdd > 0L);
 
             // gid 为空是否去 goto 表获取
             if (gid == null) {
@@ -404,7 +410,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
                     .pv(1)
                     .uv(uvFirstFlag.get() ? 1 : 0)
-                    .uip(1)
+                    .uip(uipFirstFlag ? 1 : 0)
                     .hour(hour)
                     .weekday(weekIso8601Value)
                     .fullShortUrl(fullShortUrl)
@@ -413,7 +419,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .build();
             linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
         } catch (Exception ex) {
-            log.error("短连接流量访问异常", ex);
+            log.error("短连接流量访问统计异常", ex);
         }
 
 
