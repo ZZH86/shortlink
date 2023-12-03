@@ -11,6 +11,7 @@ import com.ch.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkStatsRespDTO;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.HashMap;
 import java.util.List;
@@ -117,6 +118,18 @@ public interface ShortLinkRemoteService {
     default Result<ShortLinkStatsRespDTO> oneShortLinkStats(ShortLinkStatsReqDTO requestParam) {
         String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats", BeanUtil.beanToMap(requestParam));
         return JSON.parseObject(resultBodyStr, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * 根据 URL 获取标题
+     *
+     * @param url 目标网站地址
+     * @return 网站标题
+     */
+    default Result<String> getTitleByUrl(@RequestParam("url") String url) {
+        String resultStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/title?url=" + url);
+        return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }
 }
