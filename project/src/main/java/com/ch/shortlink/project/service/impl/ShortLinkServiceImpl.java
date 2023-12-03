@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @Author hui cao
@@ -71,6 +72,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkOsStatsMapper linkOsStatsMapper;
 
     private final LinkBrowserStatsMapper linkBrowserStatsMapper;
+
+    private final LinkAccessLogsMapper linkAccessLogsMapper;
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -377,16 +380,18 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // stream 流用原子类
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
+
+        AtomicReference<String> uv = new AtomicReference<>();
         // 定义设置添加 uvCookie 的函数
         Runnable addResponseCookieTask = () -> {
-            String uv = UUID.fastUUID().toString();
-            Cookie uvCookie = new Cookie("uv", uv);
+            uv.set(UUID.fastUUID().toString());
+            Cookie uvCookie = new Cookie("uv", uv.get());
             uvCookie.setMaxAge(60 * 60 * 24 * 30);
             uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
             ((HttpServletResponse) response).addCookie(uvCookie);
             uvFirstFlag.set(Boolean.TRUE);
             stringRedisTemplate.opsForSet().add(
-                    String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), uv);
+                    String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), uv.get());
         };
         try {
 
@@ -397,6 +402,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .findFirst()
                         .map(Cookie::getValue)
                         .ifPresentOrElse(each -> {
+                                    uv.set(each);
                                     Long uvAdd = stringRedisTemplate.opsForSet().add(
                                             String.format(RedisKeyConstant.UV_STATS_SHORT_LINK_KEY, fullShortUrl), each);
                                     uvFirstFlag.set(uvAdd != null && uvAdd > 0L);
@@ -484,6 +490,18 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .date(new Date())
                     .build();
             linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
+
+            // ***** 访问日志统计 *****
+            LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .ip(actualIp)
+                    .browser(browser)
+                    .user(uv.get())
+                    .os(os)
+                    .build();
+            linkAccessLogsMapper.insert(linkAccessLogsDO);
+
 
         } catch (Exception ex) {
             log.error("短连接流量访问统计异常", ex);
