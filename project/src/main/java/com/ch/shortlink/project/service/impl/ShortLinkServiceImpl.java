@@ -75,6 +75,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     private final LinkAccessLogsMapper linkAccessLogsMapper;
 
+    private final LinkDeviceStatsMapper linkDeviceStatsMapper;
+
     private final StringRedisTemplate stringRedisTemplate;
 
     private final RedissonClient redissonClient;
@@ -501,6 +503,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .os(os)
                     .build();
             linkAccessLogsMapper.insert(linkAccessLogsDO);
+
+            // ***** 访问设备统计 *****
+            LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
+                    .device(LinkUtil.getDevice(((HttpServletRequest) request)))
+                    .cnt(1)
+                    .gid(gid)
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .build();
+            linkDeviceStatsMapper.shortLinkDeviceState(linkDeviceStatsDO);
 
 
         } catch (Exception ex) {
