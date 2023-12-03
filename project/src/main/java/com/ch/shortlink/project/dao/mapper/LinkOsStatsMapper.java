@@ -12,7 +12,7 @@ import org.apache.ibatis.annotations.Param;
 public interface LinkOsStatsMapper extends BaseMapper<LinkOsStatsDO> {
 
     /**
-     * 记录地区访问操作系统数据
+     * 记录访问操作系统数据
      */
     @Insert("INSERT INTO t_link_os_stats (full_short_url, gid, date, cnt, os, create_time, update_time, del_flag) " +
             "VALUES( #{linkOsStats.fullShortUrl}, #{linkOsStats.gid}, #{linkOsStats.date}, #{linkOsStats.cnt}, #{linkOsStats.os}, NOW(), NOW(), 0) " +
