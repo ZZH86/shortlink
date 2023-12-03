@@ -81,4 +81,32 @@ public class LinkUtil {
 
         return ipAddress;
     }
+
+    /**
+     * 获取访问的操作系统
+     * @param request http 请求
+     * @return os
+     */
+    public static String getOs(HttpServletRequest request){
+        String userAgent = request.getHeader("User-Agent");
+
+        String os = ""; // 存储操作系统信息
+
+        // 判断User-Agent中的关键词来确定操作系统
+        if (userAgent.toLowerCase().contains("windows")) {
+            os = "Windows";
+        } else if (userAgent.toLowerCase().contains("mac")) {
+            os = "Mac";
+        } else if (userAgent.toLowerCase().contains("linux")) {
+            os = "Linux";
+        } else if (userAgent.toLowerCase().contains("android")) {
+            os = "Android";
+        } else if (userAgent.toLowerCase().contains("iphone") || userAgent.toLowerCase().contains("ipad")) {
+            os = "iOS";
+        } else {
+            os = "Unknown";
+        }
+
+        return os;
+    }
 }

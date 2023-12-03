@@ -19,14 +19,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ch.shortlink.project.common.constant.RedisKeyConstant;
 import com.ch.shortlink.project.common.constant.ShortLinkConstant;
 import com.ch.shortlink.project.common.convention.exception.ServiceException;
-import com.ch.shortlink.project.dao.entity.LinkAccessStatsDO;
-import com.ch.shortlink.project.dao.entity.LinkLocalStatsDO;
-import com.ch.shortlink.project.dao.entity.ShortLinkDO;
-import com.ch.shortlink.project.dao.entity.ShortLinkGotoDO;
-import com.ch.shortlink.project.dao.mapper.LinkAccessStatsMapper;
-import com.ch.shortlink.project.dao.mapper.LinkLocalStatsMapper;
-import com.ch.shortlink.project.dao.mapper.ShortLinkGotoMapper;
-import com.ch.shortlink.project.dao.mapper.ShortLinkMapper;
+import com.ch.shortlink.project.dao.entity.*;
+import com.ch.shortlink.project.dao.mapper.*;
 import com.ch.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
@@ -73,6 +67,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkAccessStatsMapper linkAccessStatsMapper;
 
     private final LinkLocalStatsMapper linkLocalStatsMapper;
+
+    private final LinkOsStatsMapper linkOsStatsMapper;
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -379,7 +375,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // stream 流用原子类
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
-// 定义设置添加 uvCookie 的函数
+        // 定义设置添加 uvCookie 的函数
         Runnable addResponseCookieTask = () -> {
             String uv = UUID.fastUUID().toString();
             Cookie uvCookie = new Cookie("uv", uv);
@@ -410,7 +406,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 addResponseCookieTask.run();
             }
 
-            // uip 统计操作
+            // ***** uip 统计操作 *****
             String actualIp = LinkUtil.getActualIp((HttpServletRequest) request);
             Long uipAdd = stringRedisTemplate.opsForSet().add(
                     String.format(RedisKeyConstant.UIP_STATS_SHORT_LINK_KEY, fullShortUrl), actualIp);
@@ -438,7 +434,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .build();
             linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
 
-            // 地区统计
+            // ***** 地区统计 *****
             // 利用 get 请求通过 IP 和 高德key 去获取到高德 api 的返回参数
             HashMap<String, Object> hashMap = new HashMap<>();
             hashMap.put("ip", actualIp);
@@ -464,6 +460,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .build();
                 linkLocalStatsMapper.shortLinkLocaleState(linkLocalStatsDO);
             }
+
+            // ***** os 统计 *****
+            String os = LinkUtil.getOs((HttpServletRequest) request);
+            LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
+                    .os(os)
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .cnt(1)
+                    .date(new Date())
+                    .build();
+            linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
 
         } catch (Exception ex) {
             log.error("短连接流量访问统计异常", ex);
