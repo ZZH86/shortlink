@@ -536,6 +536,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .device(device)
                     .build();
             linkAccessLogsMapper.insert(linkAccessLogsDO);
+
+            // ***** 访问点链接今日参数统计 *****
+            baseMapper.incrementStats(gid, fullShortUrl, 1, uvFirstFlag.get() ? 1: 0,uipFirstFlag ? 1 : 0);
+
         } catch (Exception ex) {
             log.error("短连接流量访问统计异常", ex);
         }
