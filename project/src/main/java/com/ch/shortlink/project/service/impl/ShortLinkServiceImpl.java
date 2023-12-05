@@ -79,6 +79,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
 
+    private final LinkStatsTodayMapper linkStatsTodayMapper;
+
     private final StringRedisTemplate stringRedisTemplate;
 
     private final RedissonClient redissonClient;
@@ -537,8 +539,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .build();
             linkAccessLogsMapper.insert(linkAccessLogsDO);
 
-            // ***** 访问点链接今日参数统计 *****
+            // ***** 访问短链接汇总参数统计 *****
             baseMapper.incrementStats(gid, fullShortUrl, 1, uvFirstFlag.get() ? 1: 0,uipFirstFlag ? 1 : 0);
+
+            // ***** 访问短链接今日参数统计 *****
+            LinkStatsTodayDO linkStatsTodayDO = LinkStatsTodayDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .date(new Date())
+                    .todayPv(1)
+                    .todayUv(uvFirstFlag.get() ? 1 : 0)
+                    .todayUip(uipFirstFlag ? 1 : 0)
+                    .build();
+            linkStatsTodayMapper.shortLinkTodayState(linkStatsTodayDO);
 
         } catch (Exception ex) {
             log.error("短连接流量访问统计异常", ex);
