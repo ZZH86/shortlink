@@ -36,5 +36,6 @@
       <option name="ADDITIONAL_TAGS" value="Author,Description:" />
     </inspection_tool>
     <inspection_tool class="Lombok" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="SqlDialectInspection" enabled="false" level="WARNING" enabled_by_default="false" />
   </profile>
 </component>

@@ -44,6 +44,8 @@ rules:
             shardingColumn: gid
             # 分片算法，对应 rules[0].shardingAlgorithms
             shardingAlgorithmName: link_stats_today_hash_mod
+    bindingTables:
+      - t_link, t_link_stats_today
     # 分片算法
     shardingAlgorithms:
       # t_link 数据表分片算法
