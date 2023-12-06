@@ -19,6 +19,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ch.shortlink.project.common.constant.RedisKeyConstant;
 import com.ch.shortlink.project.common.constant.ShortLinkConstant;
 import com.ch.shortlink.project.common.convention.exception.ServiceException;
+import com.ch.shortlink.project.common.enums.VailDateTypeEnum;
 import com.ch.shortlink.project.dao.entity.*;
 import com.ch.shortlink.project.dao.mapper.*;
 import com.ch.shortlink.project.dto.req.ShortLinkCreateReqDTO;
@@ -357,7 +358,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             }
             originUrl += (System.currentTimeMillis());
             shortUri = HashUtil.hashToBase62(originUrl);
-            if (!(shortLinkBloomFilter.contains(requestParam.getDomain() + "/" + shortUri))) {
+            if (!(shortLinkBloomFilter.contains(createShortLinkDefaultDomain + "/" + shortUri))) {
                 break;
             }
             customGenerateCount++;
