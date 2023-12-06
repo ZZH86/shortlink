@@ -88,6 +88,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Value("${short-link.stats.local.amap-key}")
     private String statsLocalAmapKey;
 
+    @Value("${short-link.domain.default}")
+    private String createShortLinkDefaultDomain;
+
     /**
      * 创建短链接
      *
@@ -100,14 +103,14 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // 获取六位数短链接
         String shortLinkCode = getShortLinkCode(requestParam);
-        String fullShortUrl = StrBuilder.create(requestParam.getDomain())
+        String fullShortUrl = StrBuilder.create(createShortLinkDefaultDomain)
                 .append("/")
                 .append(shortLinkCode)
                 .toString();
 
         // 新创建的短链接构建
         ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                .domain(requestParam.getDomain())
+                .domain(createShortLinkDefaultDomain)
                 .shortUri(shortLinkCode)
                 .fullShortUrl(fullShortUrl)
                 .originUrl(requestParam.getOriginUrl())
@@ -138,7 +141,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // 缓存预热
         stringRedisTemplate.opsForValue().set(
-                String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, shortLinkDO.getFullShortUrl()),
+                String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl),
                 requestParam.getOriginUrl(),
                 LinkUtil.getLinkCacheValidTime(requestParam.getValidDate()),
                 TimeUnit.MILLISECONDS
@@ -148,7 +151,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         shortLinkBloomFilter.add(fullShortUrl);
         return ShortLinkCreateRespDTO.builder()
                 .gid(shortLinkDO.getGid())
-                .fullShortUrl("http://" + shortLinkDO.getFullShortUrl())
+                .fullShortUrl(fullShortUrl)
                 .originUrl(shortLinkDO.getOriginUrl())
                 .build();
     }
@@ -200,7 +203,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         IPage<ShortLinkDO> resultPage = baseMapper.pageLink(requestParam);
         return resultPage.convert(each -> {
             ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
-            result.setDomain("http://" + result.getDomain());
+            result.setDomain(result.getDomain());
             result.setFullShortUrl(result.getDomain() + "/" + result.getShortUri());
             return result;
         });
@@ -232,8 +235,14 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
      */
     @Override
     public void restoreUri(String shortUri, ServletRequest request, ServletResponse response) {
+
+        // 获取到完整短链接
         String serverName = request.getServerName();
-        String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
+        String serverPort = Optional.of(request.getServerPort())
+                .filter(each -> !Objects.equals(each, 80))
+                .map(String::valueOf)
+                .map(each -> ":" + each).orElse("");
+        String fullShortUrl = serverName + serverPort + "/" + shortUri;
 
         // 通过 redis 来存储短连接的原始链接，防止缓存击穿（缓存穿透）
         String originalLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));

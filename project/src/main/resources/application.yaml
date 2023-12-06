@@ -20,7 +20,9 @@ spring:
 short-link:
   stats:
     local:
-      amap-key: 824c511f0997586ea016f979fdb23087
+      amap-key: 824c511f0997586ea016f979fdb23087  # 高德地图 key
+  domain:
+    default: kiki.lijie:8001
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
