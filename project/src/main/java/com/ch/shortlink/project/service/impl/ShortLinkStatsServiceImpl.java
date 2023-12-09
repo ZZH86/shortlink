@@ -434,6 +434,10 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                 .map(ShortLinkStatsAccessRecordRespDTO::getUser)
                 .toList();
 
+        // 如果数据里面没有用户，说明没有数据，直接返回 null
+        if(CollUtil.isEmpty(userAccessLogsList)){
+            return null;
+        }
         // 获取用户类型列表
         List<Map<String, Object>> uvTypeList = linkAccessLogsMapper.selectUvTypeByUsers(
                 requestParam.getGid(),
