@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -111,6 +112,10 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .eq(GroupDO::getGid, requestParam.getGid())
                 .eq(GroupDO::getDelFlag, 0);
+        GroupDO groupDO1 = baseMapper.selectOne(queryWrapper);
+        if(Objects.equals(groupDO1.getName(), "默认分组")){
+            throw new ClientException("默认分组不可修改");
+        }
         GroupDO groupDO = new GroupDO();
         groupDO.setName(requestParam.getName());
         int update = baseMapper.update(groupDO, queryWrapper);
@@ -130,8 +135,13 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .eq(GroupDO::getGid, gid)
                 .eq(GroupDO::getDelFlag, 0);
+        GroupDO groupDO1 = baseMapper.selectOne(queryWrapper);
+        if(Objects.equals(groupDO1.getName(), "默认分组")){
+            throw new ClientException("默认分组不可删除");
+        }
         GroupDO groupDO = new GroupDO();
         groupDO.setDelFlag(1);
+
         int update = baseMapper.update(groupDO, queryWrapper);
         if (update < 1) {
             throw new ClientException("分组信息删除失败");
