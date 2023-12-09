@@ -15,6 +15,7 @@ import com.ch.shortlink.project.dto.req.ShortLinkStatsAccessRecordReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkStatsReqDTO;
 import com.ch.shortlink.project.dto.resp.*;
 import com.ch.shortlink.project.service.ShortLinkStatsService;
+import com.ch.shortlink.project.toolkit.LinkUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -42,6 +43,8 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
      */
     @Override
     public ShortLinkStatsRespDTO oneShortLinkStats(ShortLinkStatsReqDTO requestParam) {
+        requestParam.setStartDate(LinkUtil.convertDateFormat(requestParam.getStartDate()));
+        requestParam.setEndDate(LinkUtil.convertDateFormat(requestParam.getEndDate()));
         List<LinkAccessStatsDO> listStatsByShortLink = linkAccessStatsMapper.listStatsByShortLink(requestParam);
         if (CollUtil.isEmpty(listStatsByShortLink)) {
             return null;
@@ -236,8 +239,16 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                 .build();
     }
 
+    /**
+     * 分组短链接监控数据
+     *
+     * @param requestParam 获取分组短链接监控数据入参
+     * @return 响应参数
+     */
     @Override
     public ShortLinkStatsRespDTO groupShortLinkStats(ShortLinkGroupStatsReqDTO requestParam) {
+        requestParam.setStartDate(LinkUtil.convertDateFormat(requestParam.getStartDate()));
+        requestParam.setEndDate(LinkUtil.convertDateFormat(requestParam.getEndDate()));
         List<LinkAccessStatsDO> listStatsByGroup = linkAccessStatsMapper.listStatsByGroup(requestParam);
         if (CollUtil.isEmpty(listStatsByGroup)) {
             return null;
@@ -445,6 +456,12 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         return actualResult;
     }
 
+    /**
+     * 分页查询短链接访问记录
+     *
+     * @param requestParam 获取分组短链接监控访问记录数据入参
+     * @return 分页访问结果
+     */
     @Override
     public IPage<ShortLinkStatsAccessRecordRespDTO> groupShortLinkStatsAccessRecord(ShortLinkGroupStatsAccessRecordReqDTO requestParam) {
         LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
