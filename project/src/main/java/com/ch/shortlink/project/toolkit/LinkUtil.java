@@ -3,6 +3,7 @@ package com.ch.shortlink.project.toolkit;
 import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
 import com.ch.shortlink.project.common.constant.ShortLinkConstant;
+import com.ch.shortlink.project.common.convention.exception.ServiceException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.SneakyThrows;
 import org.jsoup.Jsoup;
@@ -11,6 +12,8 @@ import org.jsoup.nodes.Element;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Optional;
 
@@ -162,5 +165,28 @@ public class LinkUtil {
         // 这里简单判断IP地址范围，您可能需要更复杂的逻辑
         // 例如，通过调用IP地址库或调用第三方服务来判断网络类型
         return actualIp.startsWith("192.168.") || actualIp.startsWith("10.") ? "WIFI" : "Mobile";
+    }
+
+    /**
+     * 日期字符串格式转换
+     * @param dateString 输入字符串
+     * @return yyyy-MM-dd HH:mm:ss 格式字符串
+     */
+    public static String convertDateFormat(String dateString) {
+        String desiredFormat = "yyyy-MM-dd HH:mm:ss";
+        // 判断日期字符串的格式是否为"yyyy-MM-dd HH:mm:ss HH:mm:ss"
+        if (dateString.matches("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\d{2}:\\d{2}:\\d{2}$")) {
+            SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss HH:mm:ss");
+            SimpleDateFormat outputFormat = new SimpleDateFormat(desiredFormat);
+
+            try {
+                Date date = inputFormat.parse(dateString);
+                return outputFormat.format(date);
+            } catch (ParseException e) {
+                throw new ServiceException("日期字符串格式转换异常");
+            }
+        } else {
+            return dateString;
+        }
     }
 }
