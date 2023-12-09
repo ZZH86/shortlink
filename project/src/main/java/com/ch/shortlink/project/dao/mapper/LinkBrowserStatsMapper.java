@@ -1,5 +1,6 @@
 package com.ch.shortlink.project.dao.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ch.shortlink.project.dao.entity.LinkBrowserStatsDO;
 import com.ch.shortlink.project.dto.req.ShortLinkGroupStatsReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkStatsReqDTO;
@@ -14,7 +15,7 @@ import java.util.List;
  * @Author hui cao
  * @Description: 访问浏览器持久层
  */
-public interface LinkBrowserStatsMapper {
+public interface LinkBrowserStatsMapper extends BaseMapper<LinkBrowserStatsDO> {
 
     /**
      * 记录访问浏览器数据
