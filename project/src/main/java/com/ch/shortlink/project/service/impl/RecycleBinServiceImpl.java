@@ -1,6 +1,7 @@
 package com.ch.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -10,17 +11,16 @@ import com.ch.shortlink.project.common.constant.RedisKeyConstant;
 import com.ch.shortlink.project.common.convention.exception.ServiceException;
 import com.ch.shortlink.project.dao.entity.ShortLinkDO;
 import com.ch.shortlink.project.dao.mapper.ShortLinkMapper;
-import com.ch.shortlink.project.dto.req.RecycleBinRemoveReqDTO;
-import com.ch.shortlink.project.dto.req.ShortLinkRecoverRecycleBinReqDTO;
-import com.ch.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
-import com.ch.shortlink.project.dto.req.ShortLinkSaveRecycleBinReqDTO;
+import com.ch.shortlink.project.dto.req.*;
 import com.ch.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.ch.shortlink.project.service.RecycleBinService;
+import com.ch.shortlink.project.service.ShortLinkService;
 import com.ch.shortlink.project.toolkit.LinkUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -32,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements RecycleBinService {
 
     private final StringRedisTemplate stringRedisTemplate;
+
+    private final ShortLinkService shortLinkService;
 
     /**
      * 移至回收站
@@ -86,8 +88,12 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
      */
     @Override
     public void recoverRecycleBinShortLink(ShortLinkRecoverRecycleBinReqDTO requestParam) {
+        // 如果短链接的分组已经被删除了，那么就把它移到默认分组进行恢复
+        String gid = requestParam.getGid();
+        String defaultGid = requestParam.getDefaultGid();
+        
         LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getGid, gid)
                 .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
                 .eq(ShortLinkDO::getEnableStatus, 1)
                 .eq(ShortLinkDO::getDelFlag, 0);
@@ -95,11 +101,39 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
 
         int update = baseMapper.update(shortLinkDO, updateWrapper);
         if (update < 1) {
-            throw new ServiceException("移至回收站失败");
+            throw new ServiceException("恢复回收站短链接失败");
+        }
+
+        // 此时虽然恢复了，但是分组还没有变，如果分组被删除了，就进行更改分组操作
+        if(StrUtil.isNotBlank(defaultGid)){
+            LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                    .eq(ShortLinkDO::getGid, gid)
+                    .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                    .eq(ShortLinkDO::getEnableStatus, 0)
+                    .eq(ShortLinkDO::getDelFlag, 0);
+            ShortLinkDO updateShortLink = baseMapper.selectOne(queryWrapper);
+            updateShortLink.setGid(defaultGid);
+            ShortLinkUpdateReqDTO linkUpdateReqDTO = ShortLinkUpdateReqDTO.builder()
+                    .originUrl(updateShortLink.getOriginUrl())
+                    .fullShortUrl(updateShortLink.getFullShortUrl())
+                    .originGid(gid)
+                    .gid(defaultGid)
+                    .validDateType(updateShortLink.getValidDateType())
+                    .validDate(updateShortLink.getValidDate())
+                    .describe(updateShortLink.getDescribe())
+                    .build();
+            // 更新分组
+            shortLinkService.updateShortLink(linkUpdateReqDTO);
+            // 更新它的 gid 方便后续操作
+            gid = defaultGid;
         }
 
         // 拿到更新后的短链接做缓存预热
-        LambdaQueryWrapper<ShortLinkDO> linkDOLambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class).eq(ShortLinkDO::getGid, requestParam.getGid()).eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl()).eq(ShortLinkDO::getEnableStatus, 0).eq(ShortLinkDO::getDelFlag, 0);
+        LambdaQueryWrapper<ShortLinkDO> linkDOLambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getGid, gid)
+                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                .eq(ShortLinkDO::getEnableStatus, 0)
+                .eq(ShortLinkDO::getDelFlag, 0);
         ShortLinkDO newShortLinkDO = baseMapper.selectOne(linkDOLambdaQueryWrapper);
         // 将恢复的短链接重新加入到缓存中(缓存预热)
         stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()), newShortLinkDO.getOriginUrl(), LinkUtil.getLinkCacheValidTime(newShortLinkDO.getValidDate()), TimeUnit.MILLISECONDS);

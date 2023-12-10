@@ -15,6 +15,11 @@ public class ShortLinkRecoverRecycleBinReqDTO {
     private String gid;
 
     /**
+     * 分组标识
+     */
+    private String defaultGid;
+
+    /**
      * 完整短链接
      */
     private String fullShortUrl;

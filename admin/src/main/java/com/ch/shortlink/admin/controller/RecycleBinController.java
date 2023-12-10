@@ -52,7 +52,7 @@ public class RecycleBinController {
      */
     @PostMapping("/api/short-link/admin/v1/recycle-bin/recover")
     public Result<Void> recoverRecycleBinShortLink(@RequestBody ShortLinkRecoverRecycleBinReqDTO requestParam) {
-        shortLinkService.recoverRecycleBinShortLink(requestParam);
+        recycleBinService.recoverRecycleBinShortLink(requestParam);
         return Results.success();
     }
 
