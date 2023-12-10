@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ch.shortlink.admin.common.biz.user.UserContext;
+import com.ch.shortlink.admin.common.constant.RedisCacheConstant;
 import com.ch.shortlink.admin.common.convention.exception.ClientException;
 import com.ch.shortlink.admin.dao.entity.GroupDO;
 import com.ch.shortlink.admin.dao.mapper.GroupMapper;
@@ -19,6 +20,9 @@ import com.ch.shortlink.admin.service.GroupService;
 import com.ch.shortlink.admin.service.RecycleBinService;
 import com.ch.shortlink.admin.toolkit.RandomIdGenerator;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +45,11 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     private final RecycleBinService recycleBinService;
 
+    private final RedissonClient redissonClient;
+
+    @Value("${short-link.group.max-num}")
+    private Integer groupMaxNum;
+
     /**
      * 新增短链接分组
      *
@@ -53,29 +62,44 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     @Override
     public void saveGroup(String username, String groupName) {
-        String gid;
-        while (true) {
-            gid = RandomIdGenerator.generateRandomId();
-            // 根据用户名和 gid 去查询数据库，如果有就重新生成gid
-            LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
-                    .eq(GroupDO::getGid, gid)
-                    .eq(GroupDO::getUsername, username);
-            GroupDO hasGroupFlag = baseMapper.selectOne(queryWrapper);
-            if (hasGroupFlag == null) {
-                break;
+
+        RLock lock = redissonClient.getLock(String.format(RedisCacheConstant.LOCK_GROUP_CREATE_KEY, username));
+        lock.lock();
+        try{
+            LambdaQueryWrapper<GroupDO> wrapper = Wrappers.lambdaQuery(GroupDO.class)
+                    .eq(GroupDO::getUsername, username)
+                    .eq(GroupDO::getDelFlag, 0);
+            Long count = baseMapper.selectCount(wrapper);
+            if(count >= groupMaxNum){
+                throw new ClientException(String.format("已超过最大分组数: %d", groupMaxNum));
             }
+            String gid;
+            while (true) {
+                gid = RandomIdGenerator.generateRandomId();
+                // 根据用户名和 gid 去查询数据库，如果有就重新生成gid
+                LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
+                        .eq(GroupDO::getGid, gid)
+                        .eq(GroupDO::getUsername, username);
+                GroupDO hasGroupFlag = baseMapper.selectOne(queryWrapper);
+                if (hasGroupFlag == null) {
+                    break;
+                }
+            }
+            // 创建短链接分组
+            GroupDO groupDO = GroupDO.builder()
+                    .gid(gid)
+                    .sortOrder(0)
+                    .username(username)
+                    .name(groupName)
+                    .build();
+            int insert = baseMapper.insert(groupDO);
+            if (insert < 1) {
+                throw new ClientException("短链接分组创建失败");
+            }
+        }finally {
+            lock.unlock();
         }
-        // 创建短链接分组
-        GroupDO groupDO = GroupDO.builder()
-                .gid(gid)
-                .sortOrder(0)
-                .username(username)
-                .name(groupName)
-                .build();
-        int insert = baseMapper.insert(groupDO);
-        if (insert < 1) {
-            throw new ClientException("短链接分组创建失败");
-        }
+
     }
 
     /**

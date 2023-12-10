@@ -13,3 +13,8 @@ spring:
       host: 127.0.0.1
       port: 6379
 #      password: 123456
+
+short-link:
+  group:
+    # 用户最大分组数
+    max-num: 15
