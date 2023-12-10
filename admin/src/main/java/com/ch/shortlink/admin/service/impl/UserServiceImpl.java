@@ -87,7 +87,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
 
         // 获得分布式锁
-        RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getUsername());
+        RLock lock = redissonClient.getLock(String.format(LOCK_USER_REGISTER_KEY, requestParam.getUsername()));
 
         try {
             if (lock.tryLock()) {
