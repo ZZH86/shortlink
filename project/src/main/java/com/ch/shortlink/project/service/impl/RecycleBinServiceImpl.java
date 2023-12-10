@@ -130,4 +130,27 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
             throw new ServiceException("删除回收站短链接失败");
         }
     }
+
+    /**
+     * 整个分组移至回收站
+     *
+     * @param requestParam 整个分组移至回收站请求参数
+     */
+    @Override
+    public void saveBatchRecycleBin(ShortLinkSaveBatchRecycleBinReqDTO requestParam) {
+        String gid = requestParam.getGid();
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getGid, gid)
+                .eq(ShortLinkDO::getEnableStatus, 0)
+                .eq(ShortLinkDO::getDelFlag, 0);
+        List<ShortLinkDO> shortLinkDOList = baseMapper.selectList(queryWrapper);
+
+        for (ShortLinkDO shortLinkDO : shortLinkDOList) {
+            ShortLinkSaveRecycleBinReqDTO param = ShortLinkSaveRecycleBinReqDTO.builder()
+                    .gid(gid)
+                    .fullShortUrl(shortLinkDO.getFullShortUrl())
+                    .build();
+            saveRecycleBin(param);
+        }
+    }
 }

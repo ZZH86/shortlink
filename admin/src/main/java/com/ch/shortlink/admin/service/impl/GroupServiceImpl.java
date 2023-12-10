@@ -13,11 +13,14 @@ import com.ch.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
 import com.ch.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
 import com.ch.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.ch.shortlink.admin.remote.ShortLinkRemoteService;
+import com.ch.shortlink.admin.remote.dto.req.ShortLinkSaveBatchRecycleBinReqDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.admin.service.GroupService;
+import com.ch.shortlink.admin.service.RecycleBinService;
 import com.ch.shortlink.admin.toolkit.RandomIdGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,8 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     // TODO 后续重构为 springCloud Feign 调用
     ShortLinkRemoteService shortLinkService = new ShortLinkRemoteService() {
     };
+
+    private final RecycleBinService recycleBinService;
 
     /**
      * 新增短链接分组
@@ -130,7 +135,9 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
      * @param gid 分组标识
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteGroup(String gid) {
+        // 默认分组，不可删除
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .eq(GroupDO::getGid, gid)
@@ -139,9 +146,15 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         if(Objects.equals(groupDO1.getName(), "默认分组")){
             throw new ClientException("默认分组不可删除");
         }
+
+        // 删除分组前应该将所有的短链接放到回收站
+        ShortLinkSaveBatchRecycleBinReqDTO shortLinkSaveBatchRecycleBinReqDTO = ShortLinkSaveBatchRecycleBinReqDTO.builder()
+                .gid(gid).build();
+        shortLinkService.saveBatchRecycleBin(shortLinkSaveBatchRecycleBinReqDTO);
+
+        // 删除分组
         GroupDO groupDO = new GroupDO();
         groupDO.setDelFlag(1);
-
         int update = baseMapper.update(groupDO, queryWrapper);
         if (update < 1) {
             throw new ClientException("分组信息删除失败");

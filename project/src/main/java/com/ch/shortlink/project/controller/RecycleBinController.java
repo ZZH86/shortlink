@@ -3,10 +3,7 @@ package com.ch.shortlink.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ch.shortlink.project.common.convention.result.Result;
 import com.ch.shortlink.project.common.convention.result.Results;
-import com.ch.shortlink.project.dto.req.RecycleBinRemoveReqDTO;
-import com.ch.shortlink.project.dto.req.ShortLinkRecoverRecycleBinReqDTO;
-import com.ch.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
-import com.ch.shortlink.project.dto.req.ShortLinkSaveRecycleBinReqDTO;
+import com.ch.shortlink.project.dto.req.*;
 import com.ch.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.ch.shortlink.project.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +28,15 @@ public class RecycleBinController {
     @PostMapping("/api/short-link/v1/recycle-bin/save")
     public Result<Void> saveRecycleBin(@RequestBody ShortLinkSaveRecycleBinReqDTO requestParam) {
         recycleBinService.saveRecycleBin(requestParam);
+        return Results.success();
+    }
+
+    /**
+     * 整个分组移至回收站
+     */
+    @PostMapping("/api/short-link/v1/recycle-bin/saveBatch")
+    public Result<Void> saveBatchRecycleBin(@RequestBody ShortLinkSaveBatchRecycleBinReqDTO requestParam) {
+        recycleBinService.saveBatchRecycleBin(requestParam);
         return Results.success();
     }
 

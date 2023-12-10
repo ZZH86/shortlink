@@ -70,8 +70,18 @@ public interface ShortLinkRemoteService {
         });
     }
 
+    /**
+     * 移到回收站
+     */
     default void saveRecycleBin(ShortLinkSaveRecycleBinReqDTO requestParam) {
         HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recycle-bin/save", JSON.toJSONString(requestParam));
+    }
+
+    /**
+     * 批量移到回收站
+     */
+    default void saveBatchRecycleBin(ShortLinkSaveBatchRecycleBinReqDTO requestParam) {
+        HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recycle-bin/saveBatch", JSON.toJSONString(requestParam));
     }
 
     /**
