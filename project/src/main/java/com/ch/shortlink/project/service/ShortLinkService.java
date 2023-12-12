@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ch.shortlink.project.dao.entity.ShortLinkDO;
 import com.ch.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
+import com.ch.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
+import com.ch.shortlink.project.dto.resp.ShortLinkBatchCreateRespDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.project.dto.resp.ShortLinkPageRespDTO;
@@ -70,4 +72,13 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * @param shortLinkStatsRecord 短链接统计实体参数
      */
     void shortLinkStats(String fullShortUrl, String gid, ShortLinkStatsRecordDTO shortLinkStatsRecord);
+
+    /**
+     * 批量创建短链接
+     *
+     * @param requestParam 批量创建短链接请求参数
+     * @return 批量创建短链接返回参数
+     */
+    ShortLinkBatchCreateRespDTO batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam);
+
 }

@@ -4,13 +4,15 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ch.shortlink.admin.common.convention.result.Result;
 import com.ch.shortlink.admin.common.convention.result.Results;
 import com.ch.shortlink.admin.remote.ShortLinkRemoteService;
+import com.ch.shortlink.admin.remote.dto.req.ShortLinkBatchCreateReqDTO;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkUpdateReqDTO;
-import com.ch.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
-import com.ch.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
-import com.ch.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
+import com.ch.shortlink.admin.remote.dto.resp.*;
+import com.ch.shortlink.admin.toolkit.EasyExcelWebUtil;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -58,6 +60,19 @@ public class ShortLinkController {
     @GetMapping("/api/short-link/admin/v1/count")
     public Result<List<ShortLinkGroupCountQueryRespDTO>> linkGroupShortLinkCount(@RequestParam("requestParam") List<String> requestParam){
         return shortLinkService.linkGroupShortLinkCount(requestParam);
+    }
+
+    /**
+     * 批量创建短链接
+     */
+    @SneakyThrows
+    @PostMapping("/api/short-link/admin/v1/create/batch")
+    public void batchCreateShortLink(@RequestBody ShortLinkBatchCreateReqDTO requestParam, HttpServletResponse response) {
+        Result<ShortLinkBatchCreateRespDTO> shortLinkBatchCreateRespDTOResult = shortLinkService.batchCreateShortLink(requestParam);
+        if (shortLinkBatchCreateRespDTOResult.isSuccess()) {
+            List<ShortLinkBaseInfoRespDTO> baseLinkInfos = shortLinkBatchCreateRespDTOResult.getData().getBaseLinkInfos();
+            EasyExcelWebUtil.write(response, "批量创建短链接-SaaS短链接系统", ShortLinkBaseInfoRespDTO.class, baseLinkInfos);
+        }
     }
 
 }
