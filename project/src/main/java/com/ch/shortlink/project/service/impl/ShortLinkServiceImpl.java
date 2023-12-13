@@ -29,6 +29,7 @@ import com.ch.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.ch.shortlink.project.dto.resp.*;
+import com.ch.shortlink.project.mq.producer.DelayShortLinkStatsMQProducer;
 import com.ch.shortlink.project.mq.producer.DelayShortLinkStatsProducer;
 import com.ch.shortlink.project.service.LinkStatsTodayService;
 import com.ch.shortlink.project.service.ShortLinkService;
@@ -41,6 +42,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
@@ -90,7 +93,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkStatsTodayMapper linkStatsTodayMapper;
 
     private final LinkStatsTodayService linkStatsTodayService;
+
     private final DelayShortLinkStatsProducer delayShortLinkStatsProducer;
+
+    private final DelayShortLinkStatsMQProducer delayShortLinkStatsMQProducer;
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -624,8 +630,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // 获取不到锁，就交给消息队列进行延迟统计
         if (!rLock.tryLock()) {
-            // 生产者发送消息
-            delayShortLinkStatsProducer.send(statsRecord);
+            try{
+                // 生产者发送消息
+                // delayShortLinkStatsProducer.send(statsRecord);
+                SendResult sendResult = delayShortLinkStatsMQProducer.sendMessage(statsRecord);
+                if (!Objects.equals(sendResult.getSendStatus(), SendStatus.SEND_OK)) {
+                    throw new ServiceException("投递延迟短链接统计消息队列失败");
+                }
+            } catch (Throwable ex) {
+                log.error("延迟短链接统计发送错误，短链接统计实体：{}", JSON.toJSONString(statsRecord), ex);
+                throw ex;
+            }
             return;
         }
         try {

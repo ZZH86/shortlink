@@ -23,7 +23,16 @@ short-link:
       amap-key: 824c511f0997586ea016f979fdb23087  # 高德地图 key
   domain:
     default: kiki.lijie:8001
+
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   mapper-locations: classpath:mapper/*.xml
+
+rocketmq:
+  name-server: common-rocketmq-dev.magestack.cn:9876
+  producer:
+    group: kiki
+    send-message-timeout: 2000
+    retry-times-when-send-failed: 1
+    retry-times-when-send-async-failed: 1
