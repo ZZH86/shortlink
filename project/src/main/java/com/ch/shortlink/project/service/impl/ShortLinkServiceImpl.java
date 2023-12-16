@@ -31,6 +31,7 @@ import com.ch.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.ch.shortlink.project.dto.resp.*;
 import com.ch.shortlink.project.mq.producer.DelayShortLinkStatsMQProducer;
 import com.ch.shortlink.project.mq.producer.DelayShortLinkStatsProducer;
+import com.ch.shortlink.project.mq.producer.ShortLinkStatsMQProducer;
 import com.ch.shortlink.project.service.LinkStatsTodayService;
 import com.ch.shortlink.project.service.ShortLinkService;
 import com.ch.shortlink.project.toolkit.HashUtil;
@@ -97,6 +98,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final DelayShortLinkStatsProducer delayShortLinkStatsProducer;
 
     private final DelayShortLinkStatsMQProducer delayShortLinkStatsMQProducer;
+
+    private final ShortLinkStatsMQProducer shortLinkStatsMQProducer;
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -426,11 +429,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // 如果存在，直接进行跳转
         if (StrUtil.isNotBlank(originalLink)) {
-            // 访问统计
-            ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
-            shortLinkStats(fullShortUrl, null, statsRecord);
             // 重定向
             sendRedirect(response, originalLink);
+            // 访问统计
+            ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
+//            shortLinkStats(fullShortUrl, null, statsRecord);
+            shortLinkStatsMQProducer.sendMessage(statsRecord);
             return;
         }
 
@@ -456,7 +460,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             if (StrUtil.isNotBlank(originalLink)) {
                 // 访问统计
                 ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
-                shortLinkStats(fullShortUrl, null, statsRecord);
+                shortLinkStatsMQProducer.sendMessage(statsRecord);
                 // 重定向
                 sendRedirect(response, originalLink);
                 return;
@@ -512,7 +516,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 获取相关统计参数
             ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
             // 进行访问统计
-            shortLinkStats(fullShortUrl, shortLinkDO.getGid(), statsRecord);
+            shortLinkStatsMQProducer.sendMessage(statsRecord);
 
             // 重定向
             sendRedirect(response, originShortLink);
