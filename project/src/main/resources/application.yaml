@@ -33,6 +33,9 @@ rocketmq:
   name-server: common-rocketmq-dev.magestack.cn:9876
   producer:
     group: kiki
+    # 发送消息的超时时间，单位是毫秒
     send-message-timeout: 2000
-    retry-times-when-send-failed: 1
-    retry-times-when-send-async-failed: 1
+    # 同步模式下，消息发送失败后的重试次数
+    retry-times-when-send-failed: 3
+    # 异步模式下，消息发送失败后的重试次数
+    retry-times-when-send-async-failed: 3
