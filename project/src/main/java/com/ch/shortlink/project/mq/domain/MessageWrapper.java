@@ -17,10 +17,10 @@
 
 package com.ch.shortlink.project.mq.domain;
 
+import cn.hutool.core.lang.UUID;
 import lombok.*;
 
 import java.io.Serializable;
-import java.util.UUID;
 
 /**
  * 消息体包装器
@@ -49,8 +49,7 @@ public final class MessageWrapper<T> implements Serializable {
     /**
      * 唯一标识，用于客户端幂等验证
      */
-    private String uuid = UUID.randomUUID().toString();
-
+    private String uuid = UUID.fastUUID().toString();
     /**
      * 消息发送时间
      */
