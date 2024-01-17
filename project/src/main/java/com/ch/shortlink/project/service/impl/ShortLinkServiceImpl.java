@@ -540,7 +540,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             if (customGenerateCount > 10) {
                 throw new ServiceException("短链接生成频繁，请稍后再试");
             }
-            originUrl += (System.currentTimeMillis());
+            originUrl += (UUID.fastUUID().toString());
             shortUri = HashUtil.hashToBase62(originUrl);
             if (!(shortLinkBloomFilter.contains(createShortLinkDefaultDomain + "/" + shortUri))) {
                 break;
