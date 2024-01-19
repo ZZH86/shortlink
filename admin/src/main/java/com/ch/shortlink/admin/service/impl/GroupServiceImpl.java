@@ -13,11 +13,10 @@ import com.ch.shortlink.admin.dao.mapper.GroupMapper;
 import com.ch.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
 import com.ch.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
 import com.ch.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
-import com.ch.shortlink.admin.remote.ShortLinkRemoteService;
+import com.ch.shortlink.admin.remote.ShortLinkActualRemoteService;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkSaveBatchRecycleBinReqDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.ch.shortlink.admin.service.GroupService;
-import com.ch.shortlink.admin.service.RecycleBinService;
 import com.ch.shortlink.admin.toolkit.RandomIdGenerator;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RLock;
@@ -39,11 +38,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
 
-    // TODO 后续重构为 springCloud Feign 调用
-    ShortLinkRemoteService shortLinkService = new ShortLinkRemoteService() {
-    };
-
-    private final RecycleBinService recycleBinService;
+    private final ShortLinkActualRemoteService shortLinkActualRemoteService;
 
     private final RedissonClient redissonClient;
 
@@ -65,12 +60,12 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
         RLock lock = redissonClient.getLock(String.format(RedisCacheConstant.LOCK_GROUP_CREATE_KEY, username));
         lock.lock();
-        try{
+        try {
             LambdaQueryWrapper<GroupDO> wrapper = Wrappers.lambdaQuery(GroupDO.class)
                     .eq(GroupDO::getUsername, username)
                     .eq(GroupDO::getDelFlag, 0);
             Long count = baseMapper.selectCount(wrapper);
-            if(count >= groupMaxNum){
+            if (count >= groupMaxNum) {
                 throw new ClientException(String.format("已超过最大分组数: %d", groupMaxNum));
             }
             String gid;
@@ -96,7 +91,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
             if (insert < 1) {
                 throw new ClientException("短链接分组创建失败");
             }
-        }finally {
+        } finally {
             lock.unlock();
         }
 
@@ -118,7 +113,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
         // 传入用户的分组标识来查询分组列表下短链接数量
         List<ShortLinkGroupCountQueryRespDTO> countQueryRespDTOS =
-                shortLinkService.linkGroupShortLinkCount(groupDOList.stream().map(GroupDO::getGid).toList()).getData();
+                shortLinkActualRemoteService.linkGroupShortLinkCount(groupDOList.stream().map(GroupDO::getGid).toList()).getData();
 
         // 类型转换
         List<ShortLinkGroupRespDTO> results = BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
@@ -142,7 +137,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getGid, requestParam.getGid())
                 .eq(GroupDO::getDelFlag, 0);
         GroupDO groupDO1 = baseMapper.selectOne(queryWrapper);
-        if(Objects.equals(groupDO1.getName(), "默认分组")){
+        if (Objects.equals(groupDO1.getName(), "默认分组")) {
             throw new ClientException("默认分组不可修改");
         }
         GroupDO groupDO = new GroupDO();
@@ -167,14 +162,14 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getGid, gid)
                 .eq(GroupDO::getDelFlag, 0);
         GroupDO groupDO1 = baseMapper.selectOne(queryWrapper);
-        if(Objects.equals(groupDO1.getName(), "默认分组")){
+        if (Objects.equals(groupDO1.getName(), "默认分组")) {
             throw new ClientException("默认分组不可删除");
         }
 
         // 删除分组前应该将所有的短链接放到回收站
         ShortLinkSaveBatchRecycleBinReqDTO shortLinkSaveBatchRecycleBinReqDTO = ShortLinkSaveBatchRecycleBinReqDTO.builder()
                 .gid(gid).build();
-        shortLinkService.saveBatchRecycleBin(shortLinkSaveBatchRecycleBinReqDTO);
+        shortLinkActualRemoteService.saveBatchRecycleBin(shortLinkSaveBatchRecycleBinReqDTO);
 
         // 删除分组
         GroupDO groupDO = new GroupDO();

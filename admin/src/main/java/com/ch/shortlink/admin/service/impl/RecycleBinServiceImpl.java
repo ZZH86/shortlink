@@ -2,13 +2,13 @@ package com.ch.shortlink.admin.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ch.shortlink.admin.common.biz.user.UserContext;
 import com.ch.shortlink.admin.common.convention.result.Result;
 import com.ch.shortlink.admin.dao.entity.GroupDO;
 import com.ch.shortlink.admin.dao.mapper.GroupMapper;
-import com.ch.shortlink.admin.remote.ShortLinkRemoteService;
+import com.ch.shortlink.admin.remote.ShortLinkActualRemoteService;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkRecoverRecycleBinReqDTO;
 import com.ch.shortlink.admin.remote.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.ch.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
@@ -26,9 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RecycleBinServiceImpl implements RecycleBinService {
 
-    // TODO 后续重构为 springCloud Feign 调用
-    ShortLinkRemoteService shortLinkService = new ShortLinkRemoteService() {
-    };
+    private final ShortLinkActualRemoteService shortLinkActualRemoteService;
 
     private final GroupMapper groupMapper;
 
@@ -39,15 +37,15 @@ public class RecycleBinServiceImpl implements RecycleBinService {
      * @return 分页查询回收站返回对象
      */
     @Override
-    public Result<IPage<ShortLinkPageRespDTO>> pageRecycleShortLink(ShortLinkRecycleBinPageReqDTO requestParam) {
+    public Result<Page<ShortLinkPageRespDTO>> pageRecycleShortLink(ShortLinkRecycleBinPageReqDTO requestParam) {
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getUsername, UserContext.getUsername());
         List<GroupDO> groupDOList = groupMapper.selectList(queryWrapper);
-        if(CollUtil.isEmpty(groupDOList)){
+        if (CollUtil.isEmpty(groupDOList)) {
             throw new SecurityException("用户无分组信息");
         }
         requestParam.setGidList(groupDOList.stream().map(GroupDO::getGid).toList());
-        return shortLinkService.pageRecycleShortLink(requestParam);
+        return shortLinkActualRemoteService.pageRecycleShortLink(requestParam.getGidList(), requestParam.getCurrent(), requestParam.getSize());
     }
 
     /**
@@ -65,7 +63,7 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         GroupDO groupDO = groupMapper.selectOne(queryWrapper);
 
         // 被删除就恢复到默认分组
-        if(groupDO.getDelFlag() == 1){
+        if (groupDO.getDelFlag() == 1) {
             LambdaQueryWrapper<GroupDO> qw = Wrappers.lambdaQuery(GroupDO.class)
                     .eq(GroupDO::getUsername, UserContext.getUsername())
                     .eq(GroupDO::getName, "默认分组")
@@ -74,6 +72,6 @@ public class RecycleBinServiceImpl implements RecycleBinService {
             GroupDO defaultGroup = groupMapper.selectOne(qw);
             requestParam.setDefaultGid(defaultGroup.getGid());
         }
-        shortLinkService.recoverRecycleBinShortLink(requestParam);
+        shortLinkActualRemoteService.recoverRecycleBinShortLink(requestParam);
     }
 }
