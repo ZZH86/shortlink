@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ch.shortlink.admin.common.biz.user.UserContext;
 import com.ch.shortlink.admin.common.constant.RedisCacheConstant;
 import com.ch.shortlink.admin.common.convention.exception.ClientException;
+import com.ch.shortlink.admin.common.convention.exception.ServiceException;
 import com.ch.shortlink.admin.dao.entity.GroupDO;
 import com.ch.shortlink.admin.dao.mapper.GroupMapper;
 import com.ch.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
@@ -66,7 +67,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                     .eq(GroupDO::getDelFlag, 0);
             Long count = baseMapper.selectCount(wrapper);
             if (count >= groupMaxNum) {
-                throw new ClientException(String.format("已超过最大分组数: %d", groupMaxNum));
+                throw new ServiceException(String.format("已超过最大分组数: %d", groupMaxNum));
             }
             String gid;
             while (true) {
@@ -89,7 +90,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                     .build();
             int insert = baseMapper.insert(groupDO);
             if (insert < 1) {
-                throw new ClientException("短链接分组创建失败");
+                throw new ServiceException("短链接分组创建失败");
             }
         } finally {
             lock.unlock();
@@ -144,7 +145,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         groupDO.setName(requestParam.getName());
         int update = baseMapper.update(groupDO, queryWrapper);
         if (update < 1) {
-            throw new ClientException("分组信息更改失败");
+            throw new ServiceException("分组信息更改失败");
         }
     }
 
@@ -176,7 +177,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         groupDO.setDelFlag(1);
         int update = baseMapper.update(groupDO, queryWrapper);
         if (update < 1) {
-            throw new ClientException("分组信息删除失败");
+            throw new ServiceException("分组信息删除失败");
         }
     }
 

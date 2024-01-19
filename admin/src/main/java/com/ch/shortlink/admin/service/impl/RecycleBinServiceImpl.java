@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ch.shortlink.admin.common.biz.user.UserContext;
+import com.ch.shortlink.admin.common.convention.exception.ServiceException;
 import com.ch.shortlink.admin.common.convention.result.Result;
 import com.ch.shortlink.admin.dao.entity.GroupDO;
 import com.ch.shortlink.admin.dao.mapper.GroupMapper;
@@ -42,7 +43,7 @@ public class RecycleBinServiceImpl implements RecycleBinService {
                 .eq(GroupDO::getUsername, UserContext.getUsername());
         List<GroupDO> groupDOList = groupMapper.selectList(queryWrapper);
         if (CollUtil.isEmpty(groupDOList)) {
-            throw new SecurityException("用户无分组信息");
+            throw new ServiceException("用户无分组信息");
         }
         requestParam.setGidList(groupDOList.stream().map(GroupDO::getGid).toList());
         return shortLinkActualRemoteService.pageRecycleShortLink(requestParam.getGidList(), requestParam.getCurrent(), requestParam.getSize());
