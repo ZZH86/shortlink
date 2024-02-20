@@ -2,7 +2,7 @@ package com.ch.shortlink.admin.common.convention.result;
 
 /**
  * @Author hui cao
- * @Description:
+ * @Description: 全局返回对象
  */
 
 import lombok.Data;
@@ -11,9 +11,6 @@ import lombok.experimental.Accessors;
 import java.io.Serial;
 import java.io.Serializable;
 
-/**
- * 全局返回对象
- */
 @Data
 @Accessors(chain = true)
 public class Result<T> implements Serializable {
