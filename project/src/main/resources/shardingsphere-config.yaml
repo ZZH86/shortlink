@@ -71,4 +71,4 @@ rules:
           sharding-count: 16
 # 展现逻辑 SQL & 真实 SQL
 props:
-  sql-show: true
+  sql-show: false

@@ -13,7 +13,7 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-  #      password: 123456
+      password: 123456
   mvc:
     view:
       prefix: /templates/
@@ -26,13 +26,16 @@ spring:
 short-link:
   stats:
     local:
-      amap-key: 824c511f0997586ea016f979fdb23087  # 高德地图 key
+      amap-key: 0b1d1b4b36544a5da60ed43c10e3b7ef  # 高德地图 key 824c511f0997586ea016f979fdb23087
   domain:
     default: kiki.lijie:8001
+  bloomFilter:
+    count: 1000000
+    error: 0.001
 
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl # 开启配置 org.apache.ibatis.logging.stdout.StdOutImpl
   mapper-locations: classpath:mapper/*.xml
 
 rocketmq:

@@ -43,6 +43,7 @@ public class DelayShortLinkStatsMQProducer extends AbstractCommonSendProduceTemp
                 .build();
     }
 
+    // 构建消息: 消息体 + 消息id + 消息标识 (解决幂等性)
     @Override
     protected Message<?> buildMessage(ShortLinkStatsRecordDTO messageSendEvent, BaseSendExtendDTO requestParam) {
         String keys = StrUtil.isEmpty(requestParam.getKeys()) ? UUID.randomUUID().toString() : requestParam.getKeys();

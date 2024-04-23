@@ -14,13 +14,16 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-#      password: 123456
+      password: 123456
   cloud:
     nacos:
       discovery:
         server-addr: 127.0.0.1:8848
 
 short-link:
+  bloomFilter:
+    count: 1000000
+    error: 0.001
   group:
     # 用户最大分组数
     max-num: 15
