@@ -19,6 +19,7 @@ import java.util.UUID;
  * @Author hui cao
  * @Description: 延迟消费短链接统计发送者 (rocketMQ 实现)
  */
+@Deprecated
 @Slf4j
 @Component
 public class DelayShortLinkStatsMQProducer extends AbstractCommonSendProduceTemplate<ShortLinkStatsRecordDTO>{

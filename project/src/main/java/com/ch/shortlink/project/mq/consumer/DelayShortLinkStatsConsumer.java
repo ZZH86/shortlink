@@ -18,6 +18,7 @@ import static com.ch.shortlink.project.common.constant.RedisKeyConstant.DELAY_QU
  * @Author hui cao
  * @Description: 延迟记录短链接统计组件
  */
+@Deprecated
 @Component
 @RequiredArgsConstructor
 public class DelayShortLinkStatsConsumer implements InitializingBean {  // 启动阶段初始化

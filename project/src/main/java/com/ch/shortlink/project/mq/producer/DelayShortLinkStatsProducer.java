@@ -15,6 +15,7 @@ import static com.ch.shortlink.project.common.constant.RedisKeyConstant.DELAY_QU
  * @Author hui cao
  * @Description: 延迟消费短链接统计发送者
  */
+@Deprecated
 @Component
 @RequiredArgsConstructor
 public class DelayShortLinkStatsProducer {

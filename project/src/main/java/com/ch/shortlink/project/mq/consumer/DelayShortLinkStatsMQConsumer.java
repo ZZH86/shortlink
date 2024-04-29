@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
  * @Author hui cao
  * @Description: 延迟访问统计消费者
  */
+@Deprecated
 @Slf4j
 @Component
 @RequiredArgsConstructor

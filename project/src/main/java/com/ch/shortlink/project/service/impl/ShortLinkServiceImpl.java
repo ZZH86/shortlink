@@ -29,8 +29,6 @@ import com.ch.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.ch.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.ch.shortlink.project.dto.resp.*;
-import com.ch.shortlink.project.mq.producer.DelayShortLinkStatsMQProducer;
-import com.ch.shortlink.project.mq.producer.DelayShortLinkStatsProducer;
 import com.ch.shortlink.project.mq.producer.ShortLinkStatsMQProducer;
 import com.ch.shortlink.project.service.LinkStatsTodayService;
 import com.ch.shortlink.project.service.ShortLinkService;
@@ -43,8 +41,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.client.producer.SendResult;
-import org.apache.rocketmq.client.producer.SendStatus;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
@@ -94,10 +90,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkStatsTodayMapper linkStatsTodayMapper;
 
     private final LinkStatsTodayService linkStatsTodayService;
-
-    private final DelayShortLinkStatsProducer delayShortLinkStatsProducer;
-
-    private final DelayShortLinkStatsMQProducer delayShortLinkStatsMQProducer;
 
     private final ShortLinkStatsMQProducer shortLinkStatsMQProducer;
 
@@ -219,9 +211,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 获得当前短链接修改分组的分布式读写锁
             RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, requestParam.getFullShortUrl()));
             RLock rLock = readWriteLock.writeLock();
-            if (!rLock.tryLock()) {
-                throw new ServiceException("短链接正在被访问，请稍后再试...");
-            }
+//            if (!rLock.tryLock()) {
+//                throw new ServiceException("短链接正在被访问，请稍后再试...");
+//            }
+            rLock.lock();
             try {
                 // 短链接表: 更新删除时间，删除原始短链接，新增一个新分组的短链接
                 LambdaUpdateWrapper<ShortLinkDO> linkUpdateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
@@ -631,22 +624,23 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         // 获取分布式读锁
         RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, fullShortUrl));
         RLock rLock = readWriteLock.readLock();
+        rLock.lock();
 
         // 获取不到锁，就交给消息队列进行延迟统计
-        if (!rLock.tryLock()) {
-            try{
-                // 生产者发送消息
-                // delayShortLinkStatsProducer.send(statsRecord);
-                SendResult sendResult = delayShortLinkStatsMQProducer.sendMessage(statsRecord);
-                if (!Objects.equals(sendResult.getSendStatus(), SendStatus.SEND_OK)) {
-                    throw new ServiceException("投递延迟短链接统计消息队列失败");
-                }
-            } catch (Throwable ex) {
-                log.error("延迟短链接统计发送错误，短链接统计实体：{}", JSON.toJSONString(statsRecord), ex);
-                throw ex;
-            }
-            return;
-        }
+//        if (!rLock.tryLock()) {
+//            try{
+//                // 生产者发送消息
+//                // delayShortLinkStatsProducer.send(statsRecord);
+//                SendResult sendResult = delayShortLinkStatsMQProducer.sendMessage(statsRecord);
+//                if (!Objects.equals(sendResult.getSendStatus(), SendStatus.SEND_OK)) {
+//                    throw new ServiceException("投递延迟短链接统计消息队列失败");
+//                }
+//            } catch (Throwable ex) {
+//                log.error("延迟短链接统计发送错误，短链接统计实体：{}", JSON.toJSONString(statsRecord), ex);
+//                throw ex;
+//            }
+//            return;
+//        }
         try {
             // 这里之所以不直接传 gid ，是因为可能统计还没开始 gid 被更改
             if (StrUtil.isBlank(gid)) {
