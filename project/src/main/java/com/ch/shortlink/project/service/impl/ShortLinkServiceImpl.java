@@ -211,9 +211,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 获得当前短链接修改分组的分布式读写锁
             RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, requestParam.getFullShortUrl()));
             RLock rLock = readWriteLock.writeLock();
-//            if (!rLock.tryLock()) {
-//                throw new ServiceException("短链接正在被访问，请稍后再试...");
-//            }
+
             rLock.lock();
             try {
                 // 短链接表: 更新删除时间，删除原始短链接，新增一个新分组的短链接
@@ -371,7 +369,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if(StrUtil.isBlank(requestParam.getGid())){
             return null;
         }
-        IPage<ShortLinkDO> resultPage = baseMapper.pageLink(requestParam);   // TODO 看一下这里查出来的是什么
+        IPage<ShortLinkDO> resultPage = baseMapper.pageLink(requestParam);
         return resultPage.convert(each -> {
             ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
 //            result.setDomain("http://" + result.getDomain());
@@ -425,9 +423,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 重定向
             sendRedirect(response, originalLink);
             // 访问统计
-            ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
-//            shortLinkStats(fullShortUrl, null, statsRecord);
-            shortLinkStatsMQProducer.sendMessage(statsRecord);
+            doShortLinkStats(fullShortUrl, request, response);
+
             return;
         }
 
@@ -452,8 +449,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             originalLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
             if (StrUtil.isNotBlank(originalLink)) {
                 // 访问统计
-                ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
-                shortLinkStatsMQProducer.sendMessage(statsRecord);
+                doShortLinkStats(fullShortUrl, request, response);
                 // 重定向
                 sendRedirect(response, originalLink);
                 return;
@@ -506,10 +502,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     TimeUnit.MILLISECONDS
             );
 
-            // 获取相关统计参数
-            ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
             // 进行访问统计
-            shortLinkStatsMQProducer.sendMessage(statsRecord);
+            doShortLinkStats(fullShortUrl, request, response);
 
             // 重定向
             sendRedirect(response, originShortLink);
@@ -611,6 +605,18 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     }
 
     /**
+     * 执行统计消息封装与统计调用
+     */
+    public void doShortLinkStats(String fullShortUrl, ServletRequest request, ServletResponse response){
+        // 构建短链接访问统计消息体
+        ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordAndSetUser(fullShortUrl, request, response);
+
+        // 发送访问统计消息到消息队列
+        // TODO 消息发送不成功怎么办？进行重试不行就抛异常，重试可以采用 spring-retry 或者线程池来异步执行
+        shortLinkStatsMQProducer.sendMessage(statsRecord);
+    }
+
+    /**
      * 短链接统计
      *
      * @param fullShortUrl         完整短链接
@@ -618,6 +624,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
      * @param statsRecord 短链接统计实体参数
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void shortLinkStats(String fullShortUrl, String gid, ShortLinkStatsRecordDTO statsRecord) {
         fullShortUrl = Optional.ofNullable(fullShortUrl).orElse(statsRecord.getFullShortUrl());
 
@@ -626,21 +633,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         RLock rLock = readWriteLock.readLock();
         rLock.lock();
 
-        // 获取不到锁，就交给消息队列进行延迟统计
-//        if (!rLock.tryLock()) {
-//            try{
-//                // 生产者发送消息
-//                // delayShortLinkStatsProducer.send(statsRecord);
-//                SendResult sendResult = delayShortLinkStatsMQProducer.sendMessage(statsRecord);
-//                if (!Objects.equals(sendResult.getSendStatus(), SendStatus.SEND_OK)) {
-//                    throw new ServiceException("投递延迟短链接统计消息队列失败");
-//                }
-//            } catch (Throwable ex) {
-//                log.error("延迟短链接统计发送错误，短链接统计实体：{}", JSON.toJSONString(statsRecord), ex);
-//                throw ex;
-//            }
-//            return;
-//        }
         try {
             // 这里之所以不直接传 gid ，是因为可能统计还没开始 gid 被更改
             if (StrUtil.isBlank(gid)) {
@@ -760,6 +752,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             linkStatsTodayMapper.shortLinkTodayState(linkStatsTodayDO);
         } catch (Throwable ex) {
             log.error("短链接访问量统计异常", ex);
+            throw ex;
         } finally {
             rLock.unlock();
         }
