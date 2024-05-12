@@ -114,7 +114,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
 
         // 获取六位数短链接
-        String shortLinkCode = getShortLinkCode(requestParam);
+        String shortLinkCode = getShortLinkCode();
         String fullShortUrl = createShortLinkDefaultDomain + "/" + shortLinkCode;
 
         // 新创建的短链接构建
@@ -516,19 +516,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     /**
      * 获得六位数短链接
      *
-     * @param requestParam 请求参数
      * @return 六位短链接
      */
-    private String getShortLinkCode(ShortLinkCreateReqDTO requestParam) {
-        String originUrl = requestParam.getOriginUrl();
+    private String getShortLinkCode() {
         String shortUri;
         int customGenerateCount = 0;
         while (true) {
             if (customGenerateCount > 10) {
                 throw new ServiceException("短链接生成频繁，请稍后再试");
             }
-            originUrl += (UUID.fastUUID().toString());
-            shortUri = HashUtil.hashToBase62(originUrl);
+            shortUri = HashUtil.base62Generator();
             if (!(shortLinkBloomFilter.contains(createShortLinkDefaultDomain + "/" + shortUri))) {
                 break;
             }
