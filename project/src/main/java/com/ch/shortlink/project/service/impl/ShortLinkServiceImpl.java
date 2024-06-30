@@ -145,6 +145,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             baseMapper.insert(shortLinkDO);
             shortLinkGotoMapper.insert(shortLinkGotoDO);
         } catch (Exception e) {
+            // 首先判断是否存在布隆过滤器，如果不存在直接新增
+            if (!shortLinkBloomFilter.contains(fullShortUrl)) {
+                shortLinkBloomFilter.add(fullShortUrl);
+            }
             log.warn("短链接：{} 重复入库", fullShortUrl);
             throw new ServiceException("重复创建");
         }
