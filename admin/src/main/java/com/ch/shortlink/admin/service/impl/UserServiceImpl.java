@@ -153,7 +153,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
 
-        // 用户已经登录
+        // 用户已经登录,限定只有一个用户登录
+        Boolean hasLogin = stringRedisTemplate.hasKey(USER_LOGIN_KEY + requestParam.getUsername());
+        if (hasLogin != null && hasLogin) {
+            throw new ClientException(UserErrorCodeEnum.USER_LOGIN_EXIST);
+        }
         Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash().entries(USER_LOGIN_KEY + requestParam.getUsername());
         if (CollUtil.isNotEmpty(hasLoginMap)) {
             stringRedisTemplate.expire(USER_LOGIN_KEY + requestParam.getUsername(), 30L, TimeUnit.MINUTES);
